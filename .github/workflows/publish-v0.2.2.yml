@@ -1,0 +1,83 @@
+name: Publish SAPGUN Media Grabber v0.2.2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-v0.2.2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare build folders
+        shell: powershell
+        run: New-Item -ItemType Directory -Force build, build\bin | Out-Null
+
+      - name: Compile WinForms GUI
+        shell: powershell
+        run: |
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          if (-not (Test-Path $csc)) { throw "csc.exe not found" }
+          & $csc /nologo /target:winexe /optimize+ /platform:anycpu `
+            /main:SapgunMediaGrabber.AppEntry `
+            /reference:System.dll /reference:System.Core.dll `
+            /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
+            '/out:build\SAPGUN Media Grabber.exe' src\Program.cs src\ThemeLinks.cs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Download latest yt-dlp
+        shell: powershell
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" `
+            -OutFile "build\bin\yt-dlp.exe"
+          & "build\bin\yt-dlp.exe" --version
+
+      - name: Download FFmpeg
+        shell: powershell
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" `
+            -OutFile "$env:TEMP\ffmpeg.zip"
+          Expand-Archive "$env:TEMP\ffmpeg.zip" "$env:TEMP\ffmpeg" -Force
+          $ffmpeg = Get-ChildItem "$env:TEMP\ffmpeg" -Filter ffmpeg.exe -Recurse | Select-Object -First 1
+          $ffprobe = Get-ChildItem "$env:TEMP\ffmpeg" -Filter ffprobe.exe -Recurse | Select-Object -First 1
+          if (-not $ffmpeg -or -not $ffprobe) { throw "FFmpeg binaries not found" }
+          Copy-Item $ffmpeg.FullName "build\bin\ffmpeg.exe"
+          Copy-Item $ffprobe.FullName "build\bin\ffprobe.exe"
+          & "build\bin\ffmpeg.exe" -version | Select-Object -First 1
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: powershell
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\setup.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify installer
+        shell: powershell
+        run: |
+          if (-not (Test-Path "dist\SAPGUN-Media-Grabber-Setup.exe")) { throw "Installer missing" }
+          Get-Item "dist\SAPGUN-Media-Grabber-Setup.exe" | Format-List Name,Length,LastWriteTime
+          Get-FileHash "dist\SAPGUN-Media-Grabber-Setup.exe" -Algorithm SHA256
+
+      - name: Publish v0.2.2 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.2.2
+          name: SAPGUN Media Grabber v0.2.2
+          target_commitish: main
+          files: dist/SAPGUN-Media-Grabber-Setup.exe
+          body_path: RELEASE_NOTES.md
