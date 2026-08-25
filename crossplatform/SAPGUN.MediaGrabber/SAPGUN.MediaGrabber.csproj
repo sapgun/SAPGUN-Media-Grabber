@@ -9,6 +9,7 @@
     <RootNamespace>SapgunMediaGrabber</RootNamespace>
     <Version>0.3.0-alpha.1</Version>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <AvaloniaNameGeneratorFilterByPath>__manual-control-lookup__</AvaloniaNameGeneratorFilterByPath>
   </PropertyGroup>
 
   <ItemGroup>
