@@ -5,7 +5,7 @@
 - Detailed X/Twitter FFmpeg conversion progress with percentage and processed media time
 - Dark / light mode toggle with local preference persistence
 - Feedback / DM on X button linked to @caro7370
-- Ko-fi `Support me` button scaffold; the exact user Ko-fi page URL must be configured before the release is merged
+- Ko-fi `Support me` button scaffold; exact Ko-fi page URL required before release
 
 ### Carried forward
 - Scoop FFmpeg junction isolation / WinError 448 hardening
