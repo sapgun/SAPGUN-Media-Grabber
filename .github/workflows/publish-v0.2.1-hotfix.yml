@@ -1,0 +1,118 @@
+name: Publish v0.2.1 Scoop Junction Hotfix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-v0.2.1-hotfix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch v0.2.1 source
+        shell: powershell
+        run: |
+          $path = 'src\Program.cs'
+          $s = Get-Content $path -Raw
+          $s = $s.Replace('const string AppVersion = "0.2.0";', 'const string AppVersion = "0.2.1";')
+          $s = $s.Replace('var a=new List<string>{"--newline","--no-playlist","--ffmpeg-location",Path.Combine(BaseDir,"bin"),', 'var a=new List<string>{"--ignore-config","--newline","--no-playlist","--ffmpeg-location",Ffmpeg,')
+
+          $old = 'var ps=new ProcessStartInfo{FileName=exe,Arguments=Join(args),UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8};using(var p=new Process())'
+          $new = @'
+          var ps=new ProcessStartInfo{FileName=exe,Arguments=Join(args),UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8};
+          var inheritedPath=ps.EnvironmentVariables["PATH"]??"";
+          var safePath=new List<string>();
+          var bundledBin=Path.Combine(BaseDir,"bin");
+          safePath.Add(bundledBin);
+          foreach(var raw in inheritedPath.Split(';')){
+            var entry=raw.Trim().Trim('"');
+            if(entry.Length==0)continue;
+            var lower=entry.ToLowerInvariant();
+            if(lower.Contains(@"\scoop\apps\ffmpeg\current")||lower.Contains(@"\scoop\apps\ffmpeg-shared\current"))continue;
+            if(String.Equals(entry,bundledBin,StringComparison.OrdinalIgnoreCase))continue;
+            safePath.Add(entry);
+          }
+          ps.EnvironmentVariables["PATH"]=String.Join(";",safePath.ToArray());
+          using(var p=new Process())
+          '@
+          if (-not $s.Contains($old)) { throw 'Expected Run() source pattern not found' }
+          $s = $s.Replace($old, $new.Trim())
+
+          $oldErr = 'if(rc!=0){string e=Tail(err.ToString(),1800);if(e.IndexOf("403",StringComparison.OrdinalIgnoreCase)>=0&&cookies.SelectedIndex==0)e+="\r\n\r\nTIP: Select Browser Cookies and retry. Also update yt-dlp.";throw new Exception("yt-dlp failed:\r\n\r\n"+e);}'
+          $newErr = 'if(rc!=0){string e=Tail(err.ToString(),1800);if(e.IndexOf("403",StringComparison.OrdinalIgnoreCase)>=0&&cookies.SelectedIndex==0)e+="\r\n\r\nTIP: Select Browser Cookies and retry. Also update yt-dlp.";if(e.IndexOf("WinError 448",StringComparison.OrdinalIgnoreCase)>=0)e+="\r\n\r\nTIP: Windows blocked a Scoop FFmpeg junction. v0.2.1 isolates the bundled FFmpeg from Scoop/user config paths.";throw new Exception("yt-dlp failed:\r\n\r\n"+e);}'
+          $s = $s.Replace($oldErr, $newErr)
+          Set-Content $path $s -Encoding UTF8
+
+          $iss = Get-Content 'installer\setup.iss' -Raw
+          $iss = $iss.Replace('#define MyAppVersion "0.2.0"', '#define MyAppVersion "0.2.1"')
+          Set-Content 'installer\setup.iss' $iss -Encoding UTF8
+
+      - name: Prepare build folders
+        shell: powershell
+        run: New-Item -ItemType Directory -Force build, build\bin | Out-Null
+
+      - name: Compile WinForms GUI
+        shell: powershell
+        run: |
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          if (-not (Test-Path $csc)) { throw 'csc.exe not found' }
+          & $csc /nologo /target:winexe /optimize+ /platform:anycpu `
+            /reference:System.dll /reference:System.Core.dll `
+            /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
+            '/out:build\SAPGUN Media Grabber.exe' src\Program.cs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Download latest yt-dlp
+        shell: powershell
+        run: |
+          Invoke-WebRequest `
+            -Uri 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe' `
+            -OutFile 'build\bin\yt-dlp.exe'
+          & 'build\bin\yt-dlp.exe' --version
+
+      - name: Download FFmpeg
+        shell: powershell
+        run: |
+          Invoke-WebRequest `
+            -Uri 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip' `
+            -OutFile "$env:TEMP\ffmpeg.zip"
+          Expand-Archive "$env:TEMP\ffmpeg.zip" "$env:TEMP\ffmpeg" -Force
+          $ffmpeg = Get-ChildItem "$env:TEMP\ffmpeg" -Filter ffmpeg.exe -Recurse | Select-Object -First 1
+          $ffprobe = Get-ChildItem "$env:TEMP\ffmpeg" -Filter ffprobe.exe -Recurse | Select-Object -First 1
+          if (-not $ffmpeg -or -not $ffprobe) { throw 'FFmpeg binaries not found' }
+          Copy-Item $ffmpeg.FullName 'build\bin\ffmpeg.exe'
+          Copy-Item $ffprobe.FullName 'build\bin\ffprobe.exe'
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: powershell
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\setup.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish v0.2.1 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.2.1
+          name: SAPGUN Media Grabber v0.2.1
+          target_commitish: ${{ github.sha }}
+          files: dist/SAPGUN-Media-Grabber-Setup.exe
+          body: |
+            ## v0.2.1 Hotfix
+            - Isolates bundled FFmpeg from Scoop `ffmpeg/current` and `ffmpeg-shared/current` junctions.
+            - Adds `--ignore-config` so unrelated user yt-dlp configs cannot override the app profile.
+            - Passes the bundled `ffmpeg.exe` explicitly to yt-dlp.
+            - Fixes Windows `WinError 448` / untrusted mount point failures seen with Scoop junctions.
+            - Keeps Browser Cookies and yt-dlp version/update controls from v0.2.0.
