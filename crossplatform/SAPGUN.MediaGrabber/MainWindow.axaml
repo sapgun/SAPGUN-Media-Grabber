@@ -69,10 +69,15 @@
         </StackPanel>
       </Border>
 
-      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6" Margin="0,6,0,0">
+      <TextBlock Text="SUPPORT" Margin="0,8,0,0" FontWeight="Bold"/>
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+        <Button Grid.Column="0" Content="★ Star on GitHub" Click="Star_Click"/>
+        <Button Grid.Column="1" Content="Support me · Ko-fi" Click="Support_Click"/>
+      </Grid>
+
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
         <Button x:Name="ThemeButton" Grid.Column="0" Content="Light mode" Click="Theme_Click"/>
         <Button Grid.Column="1" Content="Feedback / DM on X" Click="Feedback_Click"/>
-        <Button Grid.Column="2" Content="Support me · Ko-fi" Click="Support_Click"/>
       </Grid>
 
       <TextBlock Text="Cross-platform preview • local processing only" HorizontalAlignment="Center" Opacity="0.55" FontSize="11" Margin="0,4,0,0"/>
