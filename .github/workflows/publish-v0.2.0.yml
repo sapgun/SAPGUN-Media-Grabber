@@ -1,0 +1,37 @@
+name: Publish v0.2.0 Existing Installer
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download successful Windows installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: SAPGUN-Media-Grabber-Windows
+          path: release-artifact
+          run-id: 32837915350
+          github-token: ${{ github.token }}
+
+      - name: Publish v0.2.0 Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v0.2.0 \
+            release-artifact/SAPGUN-Media-Grabber-Setup.exe \
+            --target "$GITHUB_SHA" \
+            --title "SAPGUN Media Grabber v0.2.0" \
+            --notes-file RELEASE_NOTES.md
