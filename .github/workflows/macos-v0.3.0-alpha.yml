@@ -1,0 +1,182 @@
+name: macOS Apple Silicon v0.3.0 Alpha
+
+on:
+  push:
+    branches:
+      - feature/cross-platform-v0.3.0
+    paths:
+      - 'crossplatform/**'
+      - '.github/workflows/macos-v0.3.0-alpha.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-arm64:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Apple Silicon runner
+        run: |
+          uname -a
+          test "$(uname -m)" = "arm64"
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj
+
+      - name: Build
+        run: dotnet build crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -c Release --no-restore
+
+      - name: Create app bundle and publish self-contained osx-arm64 app
+        run: |
+          APP='dist/macos-arm64/SAPGUN Media Grabber.app'
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          dotnet publish crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj \
+            -c Release \
+            -r osx-arm64 \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -p:PublishTrimmed=false \
+            -o "$APP/Contents/MacOS"
+
+          cat > "$APP/Contents/Info.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key>
+            <string>SAPGUN Media Grabber</string>
+            <key>CFBundleDisplayName</key>
+            <string>SAPGUN Media Grabber</string>
+            <key>CFBundleIdentifier</key>
+            <string>io.github.sapgun.sapgun-media-grabber</string>
+            <key>CFBundleExecutable</key>
+            <string>SAPGUN Media Grabber</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>0.3.0</string>
+            <key>CFBundleVersion</key>
+            <string>0.3.0-alpha.1</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>14.0</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+          sed -i '' 's/^          //' "$APP/Contents/Info.plist"
+
+      - name: Bundle latest yt-dlp for macOS
+        run: |
+          TOOLS='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools'
+          mkdir -p "$TOOLS"
+          curl -fL --retry 3 \
+            https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos \
+            -o "$TOOLS/yt-dlp"
+          chmod +x "$TOOLS/yt-dlp"
+          "$TOOLS/yt-dlp" --version
+
+      - name: Bundle pinned x264-enabled FFmpeg and ffprobe for Apple Silicon
+        run: |
+          TOOLS='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools'
+          RES='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/Resources'
+          BASE='https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1'
+
+          curl -fL --retry 3 "$BASE/ffmpeg-darwin-arm64" -o "$TOOLS/ffmpeg"
+          curl -fL --retry 3 "$BASE/ffprobe-darwin-arm64" -o "$TOOLS/ffprobe"
+          curl -fL --retry 3 "$BASE/darwin-arm64.LICENSE" -o "$RES/FFmpeg-LICENSE.txt"
+          curl -fL --retry 3 "$BASE/darwin-arm64.README" -o "$RES/FFmpeg-BUILD-INFO.txt"
+
+          echo 'a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584  dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools/ffmpeg' | shasum -a 256 -c -
+          echo 'bb2db6f5d8cef919da12fbf592119a987202a8c060a886f3cab091f9cab90b64  dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools/ffprobe' | shasum -a 256 -c -
+
+          chmod +x "$TOOLS/ffmpeg" "$TOOLS/ffprobe"
+          xattr -d com.apple.quarantine "$TOOLS/ffmpeg" "$TOOLS/ffprobe" "$TOOLS/yt-dlp" 2>/dev/null || true
+          "$TOOLS/ffmpeg" -version | head -n 1
+          "$TOOLS/ffprobe" -version | head -n 1
+
+      - name: Verify arm64 binaries and required codec support
+        run: |
+          APP='dist/macos-arm64/SAPGUN Media Grabber.app'
+          TOOLS="$APP/Contents/MacOS/tools"
+          test -x "$APP/Contents/MacOS/SAPGUN Media Grabber"
+          test -x "$TOOLS/yt-dlp"
+          test -x "$TOOLS/ffmpeg"
+          test -x "$TOOLS/ffprobe"
+          file "$APP/Contents/MacOS/SAPGUN Media Grabber"
+          file "$TOOLS/yt-dlp"
+          file "$TOOLS/ffmpeg"
+          "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -q libx264
+          "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
+
+      - name: X-ready MP4 codec smoke test
+        run: |
+          TOOLS='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools'
+          "$TOOLS/ffmpeg" -y -hide_banner -loglevel error \
+            -f lavfi -i 'testsrc=size=1280x720:rate=30' \
+            -f lavfi -i 'sine=frequency=1000:sample_rate=48000' \
+            -t 3 -c:v libx264 -pix_fmt yuv420p -c:a aac /tmp/source.mp4
+
+          "$TOOLS/ffmpeg" -y -hide_banner -loglevel error -i /tmp/source.mp4 \
+            -map 0:v:0 -map '0:a:0?' \
+            -c:v libx264 -preset medium -profile:v high -level 4.1 \
+            -pix_fmt yuv420p -vf "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease" \
+            -fpsmax 30 -crf 20 -maxrate 8M -bufsize 16M \
+            -c:a aac -b:a 192k -ar 48000 -ac 2 -movflags +faststart \
+            /tmp/x-ready.mp4
+
+          VCODEC=$("$TOOLS/ffprobe" -v error -select_streams v:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          PIXFMT=$("$TOOLS/ffprobe" -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          ACODEC=$("$TOOLS/ffprobe" -v error -select_streams a:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          echo "video=$VCODEC pix_fmt=$PIXFMT audio=$ACODEC"
+          test "$VCODEC" = "h264"
+          test "$PIXFMT" = "yuv420p"
+          test "$ACODEC" = "aac"
+
+      - name: GUI launch smoke test on macOS
+        run: |
+          APP='dist/macos-arm64/SAPGUN Media Grabber.app'
+          BIN="$APP/Contents/MacOS/SAPGUN Media Grabber"
+          set +e
+          "$BIN" >/tmp/sapgun-grabber-macos.log 2>&1 &
+          PID=$!
+          sleep 8
+          if kill -0 "$PID" 2>/dev/null; then
+            echo "GUI process stayed alive on Apple Silicon macOS."
+            kill "$PID" 2>/dev/null || true
+            wait "$PID" 2>/dev/null || true
+            CODE=0
+          else
+            wait "$PID"
+            CODE=$?
+            echo "GUI exited early with code $CODE"
+            cat /tmp/sapgun-grabber-macos.log
+          fi
+          set -e
+          test "$CODE" -eq 0
+
+      - name: Package macOS Apple Silicon alpha
+        run: |
+          cd dist/macos-arm64
+          tar -czf ../SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz 'SAPGUN Media Grabber.app'
+          cd ..
+          shasum -a 256 SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz | tee SHA256SUMS-macos-arm64.txt
+
+      - name: Upload macOS alpha artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SAPGUN-Media-Grabber-macos-arm64-alpha
+          path: |
+            dist/SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz
+            dist/SHA256SUMS-macos-arm64.txt
+          if-no-files-found: error

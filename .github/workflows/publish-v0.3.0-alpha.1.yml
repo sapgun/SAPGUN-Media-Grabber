@@ -1,0 +1,341 @@
+name: Publish v0.3.0-alpha.1 Prerelease
+
+on:
+  push:
+    branches:
+      - feature/cross-platform-v0.3.0
+    paths:
+      - '.github/workflows/publish-v0.3.0-alpha.1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install GUI smoke-test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xz-utils
+
+      - name: Restore
+        run: dotnet restore crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj
+
+      - name: Build
+        run: dotnet build crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -c Release --no-restore
+
+      - name: Publish self-contained linux-x64 app
+        run: |
+          dotnet publish crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj \
+            -c Release \
+            -r linux-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -p:PublishTrimmed=false \
+            -o dist/linux-x64/app
+
+      - name: Bundle latest yt-dlp for Linux
+        run: |
+          mkdir -p dist/linux-x64/app/tools
+          curl -fL --retry 3 \
+            https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
+            -o dist/linux-x64/app/tools/yt-dlp
+          chmod +x dist/linux-x64/app/tools/yt-dlp
+          dist/linux-x64/app/tools/yt-dlp --version
+
+      - name: Bundle FFmpeg + ffprobe for Linux
+        run: |
+          curl -fL --retry 3 \
+            https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz \
+            -o /tmp/ffmpeg.tar.xz
+          mkdir -p /tmp/ffmpeg-bundle
+          tar -xJf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-bundle
+          FFMPEG=$(find /tmp/ffmpeg-bundle -type f -path '*/bin/ffmpeg' | head -n 1)
+          FFPROBE=$(find /tmp/ffmpeg-bundle -type f -path '*/bin/ffprobe' | head -n 1)
+          test -n "$FFMPEG"
+          test -n "$FFPROBE"
+          cp "$FFMPEG" dist/linux-x64/app/tools/ffmpeg
+          cp "$FFPROBE" dist/linux-x64/app/tools/ffprobe
+          chmod +x dist/linux-x64/app/tools/ffmpeg dist/linux-x64/app/tools/ffprobe
+
+      - name: Add Linux launcher and README
+        run: |
+          cat > dist/linux-x64/app/sapgun-media-grabber <<'EOF'
+          #!/usr/bin/env bash
+          set -e
+          HERE="$(cd "$(dirname "$0")" && pwd)"
+          exec "$HERE/SAPGUN Media Grabber" "$@"
+          EOF
+          sed -i 's/^          //' dist/linux-x64/app/sapgun-media-grabber
+          chmod +x dist/linux-x64/app/sapgun-media-grabber
+
+          cat > dist/linux-x64/app/README-LINUX.txt <<'EOF'
+          SAPGUN Media Grabber v0.3.0-alpha.1 — Linux x64
+
+          Run:
+            ./sapgun-media-grabber
+
+          Self-contained alpha build with yt-dlp, FFmpeg and ffprobe bundled.
+          No system Python, yt-dlp, FFmpeg or .NET installation is required.
+
+          Feedback: https://x.com/caro7370
+          Support:  https://ko-fi.com/sapgun
+          Source:   https://github.com/sapgun/SAPGUN-Media-Grabber
+          EOF
+          sed -i 's/^          //' dist/linux-x64/app/README-LINUX.txt
+
+      - name: Verify Linux bundle and GUI launch
+        run: |
+          test -x 'dist/linux-x64/app/SAPGUN Media Grabber'
+          test -x dist/linux-x64/app/sapgun-media-grabber
+          test -x dist/linux-x64/app/tools/yt-dlp
+          test -x dist/linux-x64/app/tools/ffmpeg
+          test -x dist/linux-x64/app/tools/ffprobe
+          set +e
+          xvfb-run -a timeout 8s dist/linux-x64/app/sapgun-media-grabber
+          CODE=$?
+          set -e
+          if [ "$CODE" -ne 0 ] && [ "$CODE" -ne 124 ]; then
+            exit "$CODE"
+          fi
+
+      - name: Package Linux x64
+        run: |
+          tar -C dist/linux-x64 -czf dist/SAPGUN-Media-Grabber-v0.3.0-alpha.1-linux-x64.tar.gz app
+          sha256sum dist/SAPGUN-Media-Grabber-v0.3.0-alpha.1-linux-x64.tar.gz > dist/SHA256SUMS-linux-x64.txt
+
+      - name: Upload Linux release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-x64
+          path: |
+            dist/SAPGUN-Media-Grabber-v0.3.0-alpha.1-linux-x64.tar.gz
+            dist/SHA256SUMS-linux-x64.txt
+          if-no-files-found: error
+
+  build-macos-arm64:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Apple Silicon runner
+        run: test "$(uname -m)" = "arm64"
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore and build
+        run: |
+          dotnet restore crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj
+          dotnet build crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -c Release --no-restore
+
+      - name: Create self-contained macOS app bundle
+        run: |
+          APP='dist/macos-arm64/SAPGUN Media Grabber.app'
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          dotnet publish crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj \
+            -c Release \
+            -r osx-arm64 \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -p:PublishTrimmed=false \
+            -o "$APP/Contents/MacOS"
+
+          cat > "$APP/Contents/Info.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleName</key><string>SAPGUN Media Grabber</string>
+            <key>CFBundleDisplayName</key><string>SAPGUN Media Grabber</string>
+            <key>CFBundleIdentifier</key><string>io.github.sapgun.sapgun-media-grabber</string>
+            <key>CFBundleExecutable</key><string>SAPGUN Media Grabber</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>0.3.0</string>
+            <key>CFBundleVersion</key><string>0.3.0-alpha.1</string>
+            <key>LSMinimumSystemVersion</key><string>14.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          EOF
+          sed -i '' 's/^          //' "$APP/Contents/Info.plist"
+
+      - name: Bundle yt-dlp for macOS
+        run: |
+          TOOLS='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools'
+          mkdir -p "$TOOLS"
+          curl -fL --retry 3 https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos -o "$TOOLS/yt-dlp"
+          chmod +x "$TOOLS/yt-dlp"
+
+      - name: Bundle pinned x264 FFmpeg + ffprobe
+        run: |
+          TOOLS='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools'
+          RES='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/Resources'
+          BASE='https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1'
+          curl -fL --retry 3 "$BASE/ffmpeg-darwin-arm64" -o "$TOOLS/ffmpeg"
+          curl -fL --retry 3 "$BASE/ffprobe-darwin-arm64" -o "$TOOLS/ffprobe"
+          curl -fL --retry 3 "$BASE/darwin-arm64.LICENSE" -o "$RES/FFmpeg-LICENSE.txt"
+          curl -fL --retry 3 "$BASE/darwin-arm64.README" -o "$RES/FFmpeg-BUILD-INFO.txt"
+          echo 'a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584  dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools/ffmpeg' | shasum -a 256 -c -
+          echo 'bb2db6f5d8cef919da12fbf592119a987202a8c060a886f3cab091f9cab90b64  dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools/ffprobe' | shasum -a 256 -c -
+          chmod +x "$TOOLS/ffmpeg" "$TOOLS/ffprobe"
+          xattr -d com.apple.quarantine "$TOOLS/ffmpeg" "$TOOLS/ffprobe" "$TOOLS/yt-dlp" 2>/dev/null || true
+
+      - name: Verify codecs and X-ready conversion
+        run: |
+          APP='dist/macos-arm64/SAPGUN Media Grabber.app'
+          TOOLS="$APP/Contents/MacOS/tools"
+          test -x "$APP/Contents/MacOS/SAPGUN Media Grabber"
+          test -x "$TOOLS/yt-dlp"
+          test -x "$TOOLS/ffmpeg"
+          test -x "$TOOLS/ffprobe"
+          "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -q libx264
+          "$TOOLS/ffmpeg" -y -hide_banner -loglevel error \
+            -f lavfi -i 'testsrc=size=1280x720:rate=30' \
+            -f lavfi -i 'sine=frequency=1000:sample_rate=48000' \
+            -t 2 -c:v libx264 -pix_fmt yuv420p -c:a aac /tmp/x-ready.mp4
+          VCODEC=$("$TOOLS/ffprobe" -v error -select_streams v:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          PIXFMT=$("$TOOLS/ffprobe" -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          ACODEC=$("$TOOLS/ffprobe" -v error -select_streams a:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          test "$VCODEC" = "h264"
+          test "$PIXFMT" = "yuv420p"
+          test "$ACODEC" = "aac"
+
+      - name: GUI launch smoke test on macOS
+        run: |
+          BIN='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/SAPGUN Media Grabber'
+          set +e
+          "$BIN" >/tmp/sapgun-grabber-macos.log 2>&1 &
+          PID=$!
+          sleep 8
+          if kill -0 "$PID" 2>/dev/null; then
+            kill "$PID" 2>/dev/null || true
+            wait "$PID" 2>/dev/null || true
+            CODE=0
+          else
+            wait "$PID"
+            CODE=$?
+            cat /tmp/sapgun-grabber-macos.log
+          fi
+          set -e
+          test "$CODE" -eq 0
+
+      - name: Package macOS Apple Silicon
+        run: |
+          cd dist/macos-arm64
+          tar -czf ../SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz 'SAPGUN Media Grabber.app'
+          cd ..
+          shasum -a 256 SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz > SHA256SUMS-macos-arm64.txt
+
+      - name: Upload macOS release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-arm64
+          path: |
+            dist/SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz
+            dist/SHA256SUMS-macos-arm64.txt
+          if-no-files-found: error
+
+  publish-prerelease:
+    needs:
+      - build-linux-x64
+      - build-macos-arm64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: v0.3.0-alpha.1
+    steps:
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-linux-x64
+          path: release
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-macos-arm64
+          path: release
+
+      - name: Write release notes
+        run: |
+          cat > release-notes.md <<'EOF'
+          # SAPGUN Media Grabber v0.3.0-alpha.1
+
+          First public cross-platform prerelease of the Avalonia/.NET build line.
+
+          ## Linux x64 — Alpha
+
+          Automated validation passed for:
+          - self-contained Linux x64 build
+          - bundled yt-dlp, FFmpeg and ffprobe
+          - GUI launch under Xvfb
+          - X / Twitter H.264 + AAC workflow
+
+          Download: `SAPGUN-Media-Grabber-v0.3.0-alpha.1-linux-x64.tar.gz`
+
+          Extract it and run:
+          `./app/sapgun-media-grabber`
+
+          ## macOS Apple Silicon — Experimental / Beta
+
+          Native Apple Silicon CI validation passed for:
+          - self-contained `.app`
+          - native arm64 runner
+          - pinned SHA-256-verified FFmpeg / ffprobe
+          - libx264 + AAC
+          - H.264 + AAC + yuv420p media smoke test
+          - GUI process launch
+
+          Download: `SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz`
+
+          This macOS package is intentionally marked **experimental/beta**. It is not signed or notarized yet. Finder launch, Gatekeeper behavior and browser-cookie integration still need real-user testing.
+
+          ## Important
+
+          - **Windows remains the stable release line.** This prerelease does not replace v0.2.2 as the recommended Windows download.
+          - Local processing only; no cloud converter upload.
+          - Built on yt-dlp + FFmpeg. Third-party components retain their own licenses.
+          - SHA-256 checksum files are attached for both packages.
+
+          Feedback / bug reports: https://x.com/caro7370 or GitHub Issues.
+          EOF
+
+      - name: Verify release files
+        run: |
+          ls -lah release
+          test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.1-linux-x64.tar.gz
+          test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz
+          test -f release/SHA256SUMS-linux-x64.txt
+          test -f release/SHA256SUMS-macos-arm64.txt
+
+      - name: Create or update GitHub prerelease
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title 'SAPGUN Media Grabber v0.3.0-alpha.1' \
+              --notes-file release-notes.md \
+              --prerelease
+          else
+            gh release create "$TAG" release/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title 'SAPGUN Media Grabber v0.3.0-alpha.1' \
+              --notes-file release-notes.md \
+              --prerelease
+          fi

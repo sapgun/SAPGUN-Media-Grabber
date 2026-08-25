@@ -1,6 +1,6 @@
 # SAPGUN Media Grabber
 
-A small Windows GUI for **yt-dlp + FFmpeg**.
+A lightweight local desktop GUI for **yt-dlp + FFmpeg**.
 
 Built for the simple workflow most people actually need:
 
@@ -8,8 +8,10 @@ Built for the simple workflow most people actually need:
 
 [![Download Latest Windows Release](https://img.shields.io/badge/Download-Latest%20Windows%20Release-4C6FFF?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest/download/SAPGUN-Media-Grabber-Setup.exe)
 [![View Latest Release](https://img.shields.io/badge/View-Latest%20Release-24292F?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest)
+[![Star on GitHub](https://img.shields.io/badge/★-Star%20on%20GitHub-F6C343?style=for-the-badge&logo=github&logoColor=black)](https://github.com/sapgun/SAPGUN-Media-Grabber)
 
-> **Current stable release:** Windows. macOS and Linux versions are in development.
+> **Current stable release:** Windows.  
+> **v0.3.0 alpha:** Linux x64 and macOS Apple Silicon builds now pass native GitHub Actions validation. They are not stable releases yet.
 
 ## Features
 
@@ -23,15 +25,15 @@ Built for the simple workflow most people actually need:
 - Optional **browser cookies** for 403 / sign-in protected media
 - Shows **installed yt-dlp version vs latest**
 - **Check version** and **Update yt-dlp** buttons
-- Optional yt-dlp auto-update on startup
 - **Dark / light mode** with local preference persistence
 - **Feedback / DM on X** → https://x.com/caro7370
 - **Support me · Ko-fi** → https://ko-fi.com/sapgun
+- **★ Star on GitHub** → https://github.com/sapgun/SAPGUN-Media-Grabber
 - Local processing — no web converter upload
 
 ## Install
 
-### Windows
+### Windows — stable
 
 Click **Download Latest Windows Release** above, or download `SAPGUN-Media-Grabber-Setup.exe` from the latest GitHub Release and run it.
 
@@ -41,11 +43,33 @@ https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest/download/SAPGUN-M
 **Latest release page:**  
 https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest
 
-The installer bundles current upstream `yt-dlp` and FFmpeg binaries. No Rust, Node.js, npm, Python, PATH setup, or Tauri runtime is required.
+The installer bundles current upstream `yt-dlp` and FFmpeg binaries. No Rust, Node.js, npm, Python, or PATH setup is required.
 
-### macOS / Linux
+### Linux x64 — v0.3.0 alpha
 
-Cross-platform builds are currently in development. When released, platform-specific downloads will be published on the same **Latest Release** page.
+The Avalonia/.NET Linux x64 build now passes CI on Ubuntu, including:
+
+- self-contained application publish
+- bundled yt-dlp, FFmpeg and ffprobe
+- executable verification
+- actual GUI launch under Xvfb
+- packaged `.tar.gz` artifact
+
+A public Linux download will be added to GitHub Releases after the alpha packaging flow is finalized.
+
+### macOS Apple Silicon — v0.3.0 alpha
+
+The native arm64 build now passes CI on an Apple Silicon GitHub Actions runner, including:
+
+- self-contained `.app` creation
+- native `yt-dlp_macos`
+- arm64 FFmpeg / ffprobe integrity verification
+- `libx264` + AAC availability check
+- real X-ready H.264 / AAC / yuv420p conversion smoke test
+- actual GUI process launch on macOS
+- packaged `.tar.gz` artifact
+
+The macOS build is still **alpha**. Finder launch, Gatekeeper behavior, browser-cookie UX, signing and notarization should be verified with real users before a stable release.
 
 ## Quick use
 
@@ -54,7 +78,7 @@ Cross-platform builds are currently in development. When released, platform-spec
 3. Leave **Browser Cookies = None** for normal public media.
 4. Click **DOWNLOAD**.
 5. Follow percentage / speed / ETA in the progress area.
-6. If a site returns `HTTP 403` or requires a signed-in session, select the browser where you are already signed in (Edge / Chrome / Brave / Firefox) and retry.
+6. If a site returns `HTTP 403` or requires a signed-in session, select the browser where you are already signed in and retry.
 7. If a site suddenly stops working, click **Check version** → **Update yt-dlp**.
 
 ## Why this exists
@@ -73,7 +97,7 @@ The X profile targets a conservative upload-compatible output:
 - max 30 fps
 - `faststart`
 
-It also handles source files delivered as AV1 or VP9.
+It also handles source files delivered as AV1 or VP9 by normalizing the final X-ready output.
 
 ## 403 errors
 
@@ -110,11 +134,11 @@ GitHub Releases are the canonical distribution channel for SAPGUN Media Grabber.
 **Always use:**  
 https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest
 
-The Windows release is published as:
+The current stable Windows artifact is:
 
 `SAPGUN-Media-Grabber-Setup.exe`
 
-Future macOS and Linux artifacts will be added to the same Release page, so users do not need to search for separate download pages.
+Linux and macOS artifacts will be added to the same release flow as the v0.3.0 line matures.
 
 ### Windows SmartScreen
 
