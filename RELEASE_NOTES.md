@@ -4,8 +4,8 @@
 - Detailed yt-dlp download progress with percentage, speed, ETA and size
 - Detailed X/Twitter FFmpeg conversion progress with percentage and processed media time
 - Dark / light mode toggle with local preference persistence
-- Feedback / DM on X button linked to @caro7370
-- Ko-fi `Support me` button scaffold; exact Ko-fi page URL required before release
+- Feedback / DM on X button linked to https://x.com/caro7370
+- `Support me · Ko-fi` button linked to https://ko-fi.com/sapgun
 
 ### Carried forward
 - Scoop FFmpeg junction isolation / WinError 448 hardening
