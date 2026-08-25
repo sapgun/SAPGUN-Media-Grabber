@@ -46,11 +46,12 @@ jobs:
         shell: powershell
         run: |
           Invoke-WebRequest `
-            -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" `
+            -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" `
             -OutFile "$env:TEMP\ffmpeg.zip"
           Expand-Archive "$env:TEMP\ffmpeg.zip" "$env:TEMP\ffmpeg" -Force
           $ffmpeg = Get-ChildItem "$env:TEMP\ffmpeg" -Filter ffmpeg.exe -Recurse | Select-Object -First 1
           $ffprobe = Get-ChildItem "$env:TEMP\ffmpeg" -Filter ffprobe.exe -Recurse | Select-Object -First 1
+          if (-not $ffmpeg -or -not $ffprobe) { throw "FFmpeg binaries not found in archive" }
           Copy-Item $ffmpeg.FullName "build\bin\ffmpeg.exe"
           Copy-Item $ffprobe.FullName "build\bin\ffprobe.exe"
 
