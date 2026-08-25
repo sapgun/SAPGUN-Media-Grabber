@@ -6,6 +6,11 @@ Built for the simple workflow most people actually need:
 
 **paste URL → choose output → download**
 
+[![Download Latest Windows Release](https://img.shields.io/badge/Download-Latest%20Windows%20Release-4C6FFF?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest/download/SAPGUN-Media-Grabber-Setup.exe)
+[![View Latest Release](https://img.shields.io/badge/View-Latest%20Release-24292F?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest)
+
+> **Current stable release:** Windows. macOS and Linux versions are in development.
+
 ## Features
 
 - **X / Twitter 1080p** — downloads up to 1080p and normalizes the result to H.264 + AAC for reliable X uploads
@@ -26,9 +31,21 @@ Built for the simple workflow most people actually need:
 
 ## Install
 
-Download `SAPGUN-Media-Grabber-Setup.exe` from **Releases** and run it.
+### Windows
+
+Click **Download Latest Windows Release** above, or download `SAPGUN-Media-Grabber-Setup.exe` from the latest GitHub Release and run it.
+
+**Direct latest installer:**  
+https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest/download/SAPGUN-Media-Grabber-Setup.exe
+
+**Latest release page:**  
+https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest
 
 The installer bundles current upstream `yt-dlp` and FFmpeg binaries. No Rust, Node.js, npm, Python, PATH setup, or Tauri runtime is required.
+
+### macOS / Linux
+
+Cross-platform builds are currently in development. When released, platform-specific downloads will be published on the same **Latest Release** page.
 
 ## Quick use
 
@@ -88,11 +105,16 @@ MIT — applies to the SAPGUN Media Grabber source code in this repository. Thir
 
 ## Releases
 
-Tagged releases are built on GitHub Actions for Windows and published as:
+GitHub Releases are the canonical distribution channel for SAPGUN Media Grabber.
+
+**Always use:**  
+https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest
+
+The Windows release is published as:
 
 `SAPGUN-Media-Grabber-Setup.exe`
 
-The release installer bundles the current yt-dlp and FFmpeg binaries at build time. yt-dlp can then be updated from inside the app.
+Future macOS and Linux artifacts will be added to the same Release page, so users do not need to search for separate download pages.
 
 ### Windows SmartScreen
 
