@@ -20,8 +20,8 @@ Built for the simple workflow most people actually need:
 - **Check version** and **Update yt-dlp** buttons
 - Optional yt-dlp auto-update on startup
 - **Dark / light mode** with local preference persistence
-- **Feedback / DM on X** link to the builder
-- **Support me · Ko-fi** integration; the exact Ko-fi profile URL is configured before release
+- **Feedback / DM on X** → https://x.com/caro7370
+- **Support me · Ko-fi** → https://ko-fi.com/sapgun
 - Local processing — no web converter upload
 
 ## Install
