@@ -1,0 +1,81 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SapgunMediaGrabber.MainWindow"
+        Title="SAPGUN Media Grabber v0.3.0 alpha"
+        Width="760" Height="900" MinWidth="680" MinHeight="760"
+        WindowStartupLocation="CenterScreen">
+  <ScrollViewer>
+    <StackPanel Margin="28" Spacing="12">
+      <TextBlock Text="LOCAL  •  yt-dlp + FFmpeg  •  macOS / Linux" FontSize="12" Foreground="#7EA4FF" FontWeight="Bold"/>
+      <TextBlock Text="SAPGUN Media Grabber" FontSize="30" FontWeight="Bold"/>
+      <TextBlock Text="Paste a URL. Pick a profile. Download locally." Opacity="0.72"/>
+
+      <TextBlock Text="MEDIA URL" Margin="0,10,0,0" FontWeight="Bold"/>
+      <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+        <TextBox x:Name="UrlBox" Grid.Column="0" Watermark="https://..."/>
+        <Button Grid.Column="1" Content="Paste" Click="Paste_Click" HorizontalContentAlignment="Center"/>
+      </Grid>
+
+      <TextBlock Text="OUTPUT PROFILE" Margin="0,10,0,0" FontWeight="Bold"/>
+      <StackPanel Spacing="7">
+        <RadioButton x:Name="XProfile" GroupName="profile" IsChecked="True" Content="X / Twitter 1080p — H.264 + AAC, upload-safe"/>
+        <RadioButton x:Name="OriginalProfile" GroupName="profile" Content="Original Best — highest available quality"/>
+        <RadioButton x:Name="Mp4Profile" GroupName="profile" Content="1080p MP4 — quick MP4 download / merge"/>
+        <RadioButton x:Name="Mp3Profile" GroupName="profile" Content="Audio MP3 — high quality extraction"/>
+      </StackPanel>
+
+      <TextBlock Text="BROWSER COOKIES" Margin="0,10,0,0" FontWeight="Bold"/>
+      <ComboBox x:Name="CookieBox" SelectedIndex="0">
+        <ComboBoxItem Content="None (public media)"/>
+        <ComboBoxItem Content="Safari"/>
+        <ComboBoxItem Content="Chrome"/>
+        <ComboBoxItem Content="Firefox"/>
+        <ComboBoxItem Content="Brave"/>
+        <ComboBoxItem Content="Edge"/>
+      </ComboBox>
+      <TextBlock Text="403 / sign-in errors? Pick the browser where you are already signed in." FontSize="12" Opacity="0.65"/>
+
+      <CheckBox x:Name="TrimCheck" Content="Trim / download a section" Margin="0,8,0,0"/>
+      <Grid ColumnDefinitions="*,40,*" ColumnSpacing="4">
+        <TextBox x:Name="TrimStart" Grid.Column="0" Text="00:00"/>
+        <TextBlock Grid.Column="1" Text="→" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        <TextBox x:Name="TrimEnd" Grid.Column="2" Watermark="end, e.g. 01:15"/>
+      </Grid>
+
+      <TextBlock Text="SAVE TO" Margin="0,10,0,0" FontWeight="Bold"/>
+      <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+        <TextBox x:Name="FolderBox" Grid.Column="0" IsReadOnly="True"/>
+        <Button Grid.Column="1" Content="Browse" Click="Browse_Click" HorizontalContentAlignment="Center"/>
+      </Grid>
+
+      <Button x:Name="DownloadButton" Content="DOWNLOAD" Height="50" Margin="0,10,0,0" Background="#4C6FFF" Foreground="White" FontWeight="Bold" Click="Download_Click"/>
+      <ProgressBar x:Name="Progress" Minimum="0" Maximum="100" Height="12"/>
+      <TextBlock x:Name="StatusText" Text="Ready" FontWeight="Bold" Foreground="#8ED7A7"/>
+      <TextBlock x:Name="ProgressText" Text="Waiting for a download." FontSize="12" Opacity="0.72" TextWrapping="Wrap"/>
+      <Button x:Name="OpenFolderButton" Content="Open Output Folder" IsEnabled="False" Click="OpenFolder_Click"/>
+
+      <Border BorderBrush="#404652" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,8,0,0">
+        <StackPanel Spacing="8">
+          <TextBlock Text="TOOLS & VERSION" FontWeight="Bold"/>
+          <Grid ColumnDefinitions="*,*">
+            <TextBlock x:Name="InstalledYtDlp" Grid.Column="0" Text="Installed yt-dlp: checking..." FontSize="12"/>
+            <TextBlock x:Name="LatestYtDlp" Grid.Column="1" Text="Latest: checking..." HorizontalAlignment="Right" FontSize="12"/>
+          </Grid>
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+            <Button Grid.Column="0" Content="Check version" Click="CheckYtDlp_Click"/>
+            <Button Grid.Column="1" Content="Update yt-dlp" Click="UpdateYtDlp_Click"/>
+            <Button Grid.Column="2" Content="How to use" Click="Help_Click"/>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6" Margin="0,6,0,0">
+        <Button x:Name="ThemeButton" Grid.Column="0" Content="Light mode" Click="Theme_Click"/>
+        <Button Grid.Column="1" Content="Feedback / DM on X" Click="Feedback_Click"/>
+        <Button Grid.Column="2" Content="Support me · Ko-fi" Click="Support_Click"/>
+      </Grid>
+
+      <TextBlock Text="Cross-platform preview • local processing only" HorizontalAlignment="Center" Opacity="0.55" FontSize="11" Margin="0,4,0,0"/>
+    </StackPanel>
+  </ScrollViewer>
+</Window>
