@@ -81,3 +81,5 @@ jobs:
           target_commitish: main
           files: dist/SAPGUN-Media-Grabber-Setup.exe
           body_path: RELEASE_NOTES.md
+
+# Triggered after merge to publish the v0.2.2 installer.
