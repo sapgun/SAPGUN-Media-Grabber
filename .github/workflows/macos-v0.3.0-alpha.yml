@@ -68,7 +68,7 @@ jobs:
             <key>CFBundleVersion</key>
             <string>0.3.0-alpha.1</string>
             <key>LSMinimumSystemVersion</key>
-            <string>12.0</string>
+            <string>14.0</string>
             <key>NSHighResolutionCapable</key>
             <true/>
           </dict>
@@ -86,22 +86,25 @@ jobs:
           chmod +x "$TOOLS/yt-dlp"
           "$TOOLS/yt-dlp" --version
 
-      - name: Bundle FFmpeg and ffprobe for Apple Silicon
+      - name: Bundle x264-enabled FFmpeg and ffprobe for Apple Silicon
         run: |
           TOOLS='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools'
           curl -fL --retry 3 \
-            https://github.com/binmgr/ffmpeg/releases/latest/download/ffmpeg-darwin-arm64.tar.gz \
-            -o /tmp/ffmpeg-darwin-arm64.tar.gz
-          mkdir -p /tmp/ffmpeg-macos
-          tar -xzf /tmp/ffmpeg-darwin-arm64.tar.gz -C /tmp/ffmpeg-macos
-          FFMPEG=$(find /tmp/ffmpeg-macos -type f -name ffmpeg | head -n 1)
-          FFPROBE=$(find /tmp/ffmpeg-macos -type f -name ffprobe | head -n 1)
+            https://github.com/PyAV-Org/pyav-ffmpeg/releases/latest/download/ffmpeg-macos-arm64.tar.gz \
+            -o /tmp/ffmpeg-macos-arm64.tar.gz
+          mkdir -p /tmp/pyav-ffmpeg
+          tar -xzf /tmp/ffmpeg-macos-arm64.tar.gz -C /tmp/pyav-ffmpeg
+          FFMPEG=$(find /tmp/pyav-ffmpeg -type f -path '*/bin/ffmpeg' | head -n 1)
+          FFPROBE=$(find /tmp/pyav-ffmpeg -type f -path '*/bin/ffprobe' | head -n 1)
           test -n "$FFMPEG"
           test -n "$FFPROBE"
-          cp "$FFMPEG" "$TOOLS/ffmpeg"
-          cp "$FFPROBE" "$TOOLS/ffprobe"
-          chmod +x "$TOOLS/ffmpeg" "$TOOLS/ffprobe"
-          xattr -d com.apple.quarantine "$TOOLS/ffmpeg" "$TOOLS/ffprobe" "$TOOLS/yt-dlp" 2>/dev/null || true
+          ROOT=$(dirname "$(dirname "$FFMPEG")")
+          mkdir -p "$TOOLS/pyav-ffmpeg"
+          cp -R "$ROOT"/. "$TOOLS/pyav-ffmpeg"/
+          ln -s pyav-ffmpeg/bin/ffmpeg "$TOOLS/ffmpeg"
+          ln -s pyav-ffmpeg/bin/ffprobe "$TOOLS/ffprobe"
+          chmod +x "$TOOLS/pyav-ffmpeg/bin/ffmpeg" "$TOOLS/pyav-ffmpeg/bin/ffprobe"
+          xattr -dr com.apple.quarantine "$TOOLS/pyav-ffmpeg" "$TOOLS/yt-dlp" 2>/dev/null || true
           "$TOOLS/ffmpeg" -version | head -n 1
           "$TOOLS/ffprobe" -version | head -n 1
 
@@ -115,7 +118,7 @@ jobs:
           test -x "$TOOLS/ffprobe"
           file "$APP/Contents/MacOS/SAPGUN Media Grabber"
           file "$TOOLS/yt-dlp"
-          file "$TOOLS/ffmpeg"
+          file -L "$TOOLS/ffmpeg"
           "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -q libx264
           "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
 
