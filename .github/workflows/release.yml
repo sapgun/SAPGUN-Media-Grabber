@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "0.2.0"
+  APP_VERSION: "0.2.2"
 
 jobs:
   build-release:
@@ -30,9 +30,10 @@ jobs:
           $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
           if (-not (Test-Path $csc)) { throw "csc.exe not found" }
           & $csc /nologo /target:winexe /optimize+ /platform:anycpu `
+            /main:SapgunMediaGrabber.AppEntry `
             /reference:System.dll /reference:System.Core.dll `
             /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
-            '/out:build\SAPGUN Media Grabber.exe' src\Program.cs
+            '/out:build\SAPGUN Media Grabber.exe' src\Program.cs src\ThemeLinks.cs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Download latest yt-dlp

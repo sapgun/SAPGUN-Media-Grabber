@@ -13,10 +13,15 @@ Built for the simple workflow most people actually need:
 - **1080p MP4**
 - **Audio MP3**
 - **Trim / section download**
+- Detailed **download progress** — percentage, speed, ETA and transferred size
+- Detailed **X conversion progress** — FFmpeg percentage and processed media time
 - Optional **browser cookies** for 403 / sign-in protected media
 - Shows **installed yt-dlp version vs latest**
 - **Check version** and **Update yt-dlp** buttons
 - Optional yt-dlp auto-update on startup
+- **Dark / light mode** with local preference persistence
+- **Feedback / DM on X** → https://x.com/caro7370
+- **Support me · Ko-fi** → https://ko-fi.com/sapgun
 - Local processing — no web converter upload
 
 ## Install
@@ -31,8 +36,9 @@ The installer bundles current upstream `yt-dlp` and FFmpeg binaries. No Rust, No
 2. Pick a profile.
 3. Leave **Browser Cookies = None** for normal public media.
 4. Click **DOWNLOAD**.
-5. If a site returns `HTTP 403` or requires a signed-in session, select the browser where you are already signed in (Edge / Chrome / Brave / Firefox) and retry.
-6. If a site suddenly stops working, click **Check version** → **Update yt-dlp**.
+5. Follow percentage / speed / ETA in the progress area.
+6. If a site returns `HTTP 403` or requires a signed-in session, select the browser where you are already signed in (Edge / Chrome / Brave / Firefox) and retry.
+7. If a site suddenly stops working, click **Check version** → **Update yt-dlp**.
 
 ## Why this exists
 

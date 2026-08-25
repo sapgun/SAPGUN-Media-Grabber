@@ -1,5 +1,5 @@
 #define MyAppName "SAPGUN Media Grabber"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.2.2"
 #define MyAppPublisher "SAPGUN"
 #define MyAppExeName "SAPGUN Media Grabber.exe"
 
