@@ -9,8 +9,7 @@ namespace SapgunMediaGrabber
     public class ThemedMainForm : MainForm
     {
         const string XProfileUrl = "https://x.com/caro7370";
-        // Set this to the user's exact Ko-fi page before v0.2.2 is released.
-        const string KoFiUrl = "";
+        const string KoFiUrl = "https://ko-fi.com/sapgun";
 
         bool lightMode;
         Button themeButton;
@@ -61,16 +60,11 @@ namespace SapgunMediaGrabber
             };
 
             feedbackButton.Click += delegate { OpenUrl(XProfileUrl); };
-
-            supportButton.Enabled = !String.IsNullOrWhiteSpace(KoFiUrl);
-            supportButton.Click += delegate
-            {
-                if (!String.IsNullOrWhiteSpace(KoFiUrl)) OpenUrl(KoFiUrl);
-            };
+            supportButton.Click += delegate { OpenUrl(KoFiUrl); };
 
             var tip = new ToolTip();
             tip.SetToolTip(feedbackButton, "Open @caro7370 on X to send feedback or a DM.");
-            if (!supportButton.Enabled) tip.SetToolTip(supportButton, "Ko-fi URL will be enabled when the exact page URL is configured.");
+            tip.SetToolTip(supportButton, "Support SAPGUN Media Grabber on Ko-fi.");
 
             row.Controls.Add(themeButton, 0, 0);
             row.Controls.Add(feedbackButton, 1, 0);
@@ -109,8 +103,6 @@ namespace SapgunMediaGrabber
 
             footer.BackColor = bg;
             themeButton.Text = lightMode ? "Dark mode" : "Light mode";
-
-            // Keep primary action visually distinct.
             SetDownloadAccent(this);
         }
 
