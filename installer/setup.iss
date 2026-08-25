@@ -11,7 +11,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\Programs\SAPGUN Media Grabber
 DefaultGroupName=SAPGUN Media Grabber
 PrivilegesRequired=lowest
-OutputDir=dist
+OutputDir=..\dist
 OutputBaseFilename=SAPGUN-Media-Grabber-Setup
 Compression=lzma2
 SolidCompression=yes
@@ -27,10 +27,10 @@ VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
 
 [Files]
-Source: "build\SAPGUN Media Grabber.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "build\bin\yt-dlp.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
-Source: "build\bin\ffmpeg.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
-Source: "build\bin\ffprobe.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "..\build\SAPGUN Media Grabber.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\build\bin\yt-dlp.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "..\build\bin\ffmpeg.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "..\build\bin\ffprobe.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\SAPGUN Media Grabber"; Filename: "{app}\{#MyAppExeName}"
