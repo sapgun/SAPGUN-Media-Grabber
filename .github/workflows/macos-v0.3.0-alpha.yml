@@ -86,25 +86,22 @@ jobs:
           chmod +x "$TOOLS/yt-dlp"
           "$TOOLS/yt-dlp" --version
 
-      - name: Bundle x264-enabled FFmpeg and ffprobe for Apple Silicon
+      - name: Bundle pinned x264-enabled FFmpeg and ffprobe for Apple Silicon
         run: |
           TOOLS='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools'
-          curl -fL --retry 3 \
-            https://github.com/PyAV-Org/pyav-ffmpeg/releases/latest/download/ffmpeg-macos-arm64.tar.gz \
-            -o /tmp/ffmpeg-macos-arm64.tar.gz
-          mkdir -p /tmp/pyav-ffmpeg
-          tar -xzf /tmp/ffmpeg-macos-arm64.tar.gz -C /tmp/pyav-ffmpeg
-          FFMPEG=$(find /tmp/pyav-ffmpeg -type f -path '*/bin/ffmpeg' | head -n 1)
-          FFPROBE=$(find /tmp/pyav-ffmpeg -type f -path '*/bin/ffprobe' | head -n 1)
-          test -n "$FFMPEG"
-          test -n "$FFPROBE"
-          ROOT=$(dirname "$(dirname "$FFMPEG")")
-          mkdir -p "$TOOLS/pyav-ffmpeg"
-          cp -R "$ROOT"/. "$TOOLS/pyav-ffmpeg"/
-          ln -s pyav-ffmpeg/bin/ffmpeg "$TOOLS/ffmpeg"
-          ln -s pyav-ffmpeg/bin/ffprobe "$TOOLS/ffprobe"
-          chmod +x "$TOOLS/pyav-ffmpeg/bin/ffmpeg" "$TOOLS/pyav-ffmpeg/bin/ffprobe"
-          xattr -dr com.apple.quarantine "$TOOLS/pyav-ffmpeg" "$TOOLS/yt-dlp" 2>/dev/null || true
+          RES='dist/macos-arm64/SAPGUN Media Grabber.app/Contents/Resources'
+          BASE='https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1'
+
+          curl -fL --retry 3 "$BASE/ffmpeg-darwin-arm64" -o "$TOOLS/ffmpeg"
+          curl -fL --retry 3 "$BASE/ffprobe-darwin-arm64" -o "$TOOLS/ffprobe"
+          curl -fL --retry 3 "$BASE/darwin-arm64.LICENSE" -o "$RES/FFmpeg-LICENSE.txt"
+          curl -fL --retry 3 "$BASE/darwin-arm64.README" -o "$RES/FFmpeg-BUILD-INFO.txt"
+
+          echo 'a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584  dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools/ffmpeg' | shasum -a 256 -c -
+          echo 'bb2db6f5d8cef919da12fbf592119a987202a8c060a886f3cab091f9cab90b64  dist/macos-arm64/SAPGUN Media Grabber.app/Contents/MacOS/tools/ffprobe' | shasum -a 256 -c -
+
+          chmod +x "$TOOLS/ffmpeg" "$TOOLS/ffprobe"
+          xattr -d com.apple.quarantine "$TOOLS/ffmpeg" "$TOOLS/ffprobe" "$TOOLS/yt-dlp" 2>/dev/null || true
           "$TOOLS/ffmpeg" -version | head -n 1
           "$TOOLS/ffprobe" -version | head -n 1
 
@@ -118,7 +115,7 @@ jobs:
           test -x "$TOOLS/ffprobe"
           file "$APP/Contents/MacOS/SAPGUN Media Grabber"
           file "$TOOLS/yt-dlp"
-          file -L "$TOOLS/ffmpeg"
+          file "$TOOLS/ffmpeg"
           "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -q libx264
           "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
 
