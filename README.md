@@ -21,7 +21,7 @@ Built for the simple workflow most people actually need:
 - Optional yt-dlp auto-update on startup
 - **Dark / light mode** with local preference persistence
 - **Feedback / DM on X** link to the builder
-- **Support me · Ko-fi** integration (the exact Ko-fi profile URL is configured before release)
+- **Support me · Ko-fi** integration; the exact Ko-fi profile URL is configured before release
 - Local processing — no web converter upload
 
 ## Install
