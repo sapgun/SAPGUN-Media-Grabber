@@ -1,0 +1,344 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Net.Http.Headers;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml;
+using Avalonia.Platform.Storage;
+using Avalonia.Styling;
+using Avalonia.Threading;
+
+namespace SapgunMediaGrabber;
+
+public partial class MainWindow : Window
+{
+    const string AppVersion = "0.3.0-alpha.1";
+    const string XProfileUrl = "https://x.com/caro7370";
+    const string KoFiUrl = "https://ko-fi.com/sapgun";
+
+    readonly string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SAPGUN Media Grabber");
+    readonly string toolsDir;
+    readonly string settingsFile;
+
+    TextBox UrlBox => this.FindControl<TextBox>("UrlBox")!;
+    TextBox FolderBox => this.FindControl<TextBox>("FolderBox")!;
+    TextBox TrimStart => this.FindControl<TextBox>("TrimStart")!;
+    TextBox TrimEnd => this.FindControl<TextBox>("TrimEnd")!;
+    CheckBox TrimCheck => this.FindControl<CheckBox>("TrimCheck")!;
+    RadioButton XProfile => this.FindControl<RadioButton>("XProfile")!;
+    RadioButton OriginalProfile => this.FindControl<RadioButton>("OriginalProfile")!;
+    RadioButton Mp4Profile => this.FindControl<RadioButton>("Mp4Profile")!;
+    ComboBox CookieBox => this.FindControl<ComboBox>("CookieBox")!;
+    Button DownloadButton => this.FindControl<Button>("DownloadButton")!;
+    Button OpenFolderButton => this.FindControl<Button>("OpenFolderButton")!;
+    Button ThemeButton => this.FindControl<Button>("ThemeButton")!;
+    ProgressBar Progress => this.FindControl<ProgressBar>("Progress")!;
+    TextBlock StatusText => this.FindControl<TextBlock>("StatusText")!;
+    TextBlock ProgressText => this.FindControl<TextBlock>("ProgressText")!;
+    TextBlock InstalledYtDlp => this.FindControl<TextBlock>("InstalledYtDlp")!;
+    TextBlock LatestYtDlp => this.FindControl<TextBlock>("LatestYtDlp")!;
+
+    string lastOutput = "";
+    bool lightMode;
+
+    public MainWindow()
+    {
+        AvaloniaXamlLoader.Load(this);
+        toolsDir = Path.Combine(dataDir, "tools");
+        settingsFile = Path.Combine(dataDir, "theme.txt");
+        Directory.CreateDirectory(toolsDir);
+        SeedBundledTools();
+
+        var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        FolderBox.Text = Directory.Exists(downloads) ? downloads : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        lightMode = LoadTheme();
+        ApplyTheme();
+        Opened += async (_, _) => await RefreshYtDlpVersions(false);
+    }
+
+    string ToolName(string baseName) => OperatingSystem.IsWindows() ? baseName + ".exe" : baseName;
+    string YtDlp => Path.Combine(toolsDir, ToolName("yt-dlp"));
+    string Ffmpeg => Path.Combine(toolsDir, ToolName("ffmpeg"));
+    string Ffprobe => Path.Combine(toolsDir, ToolName("ffprobe"));
+
+    void SeedBundledTools()
+    {
+        var seed = Path.Combine(AppContext.BaseDirectory, "tools");
+        if (!Directory.Exists(seed)) return;
+        foreach (var name in new[] { ToolName("yt-dlp"), ToolName("ffmpeg"), ToolName("ffprobe") })
+        {
+            var source = Path.Combine(seed, name);
+            var target = Path.Combine(toolsDir, name);
+            if (File.Exists(source) && !File.Exists(target)) File.Copy(source, target);
+            EnsureExecutable(target);
+        }
+    }
+
+    static void EnsureExecutable(string path)
+    {
+        if (OperatingSystem.IsWindows() || !File.Exists(path)) return;
+        try
+        {
+            File.SetUnixFileMode(path,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        }
+        catch { }
+    }
+
+    async void Paste_Click(object? sender, RoutedEventArgs e)
+    {
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard != null) UrlBox.Text = await clipboard.GetTextAsync() ?? "";
+    }
+
+    async void Browse_Click(object? sender, RoutedEventArgs e)
+    {
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Choose download folder", AllowMultiple = false });
+        if (folders.Count > 0) FolderBox.Text = folders[0].Path.LocalPath;
+    }
+
+    async void Download_Click(object? sender, RoutedEventArgs e) => await StartDownload();
+    void OpenFolder_Click(object? sender, RoutedEventArgs e) => OpenTarget(File.Exists(lastOutput) ? Path.GetDirectoryName(lastOutput)! : FolderBox.Text ?? "");
+    async void CheckYtDlp_Click(object? sender, RoutedEventArgs e) => await RefreshYtDlpVersions(true);
+
+    async void UpdateYtDlp_Click(object? sender, RoutedEventArgs e)
+    {
+        if (!File.Exists(YtDlp)) { await ShowInfo("yt-dlp is missing from the app tools folder."); return; }
+        StatusText.Text = "Updating yt-dlp...";
+        var result = await RunProcess(YtDlp, new[] { "-U" }, (_, _) => { });
+        await RefreshYtDlpVersions(false);
+        await ShowInfo(result == 0 ? "yt-dlp update complete." : "yt-dlp update failed. Check your connection and try again.");
+    }
+
+    async void Help_Click(object? sender, RoutedEventArgs e)
+    {
+        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nTrim is optional. Everything is processed locally.");
+    }
+
+    void Theme_Click(object? sender, RoutedEventArgs e)
+    {
+        lightMode = !lightMode;
+        ApplyTheme();
+        try { File.WriteAllText(settingsFile, lightMode ? "light" : "dark"); } catch { }
+    }
+
+    void Feedback_Click(object? sender, RoutedEventArgs e) => OpenTarget(XProfileUrl);
+    void Support_Click(object? sender, RoutedEventArgs e) => OpenTarget(KoFiUrl);
+
+    bool LoadTheme()
+    {
+        try { return File.Exists(settingsFile) && File.ReadAllText(settingsFile).Trim().Equals("light", StringComparison.OrdinalIgnoreCase); }
+        catch { return false; }
+    }
+
+    void ApplyTheme()
+    {
+        if (Application.Current != null) Application.Current.RequestedThemeVariant = lightMode ? ThemeVariant.Light : ThemeVariant.Dark;
+        ThemeButton.Content = lightMode ? "Dark mode" : "Light mode";
+    }
+
+    string Mode() => OriginalProfile.IsChecked == true ? "original" : Mp4Profile.IsChecked == true ? "mp4" : this.FindControl<RadioButton>("Mp3Profile")!.IsChecked == true ? "mp3" : "x";
+
+    string? BrowserCookie()
+    {
+        if (CookieBox.SelectedIndex <= 0) return null;
+        return (CookieBox.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant();
+    }
+
+    async Task StartDownload()
+    {
+        var mediaUrl = (UrlBox.Text ?? "").Trim();
+        var outputDir = (FolderBox.Text ?? "").Trim();
+        if (!Uri.TryCreate(mediaUrl, UriKind.Absolute, out var uri) || (uri.Scheme != "http" && uri.Scheme != "https")) { await ShowInfo("Enter a valid http(s) URL."); return; }
+        if (!Directory.Exists(outputDir)) { await ShowInfo("Choose a valid output folder."); return; }
+        if (!File.Exists(YtDlp) || !File.Exists(Ffmpeg)) { await ShowInfo("Platform tools are missing. Reinstall this build or use a release that bundles yt-dlp + FFmpeg."); return; }
+
+        SetBusy(true);
+        Progress.Value = 0;
+        StatusText.Text = "Downloading — 0%";
+        ProgressText.Text = "Starting yt-dlp...";
+
+        try
+        {
+            var args = new List<string> { "--ignore-config", "--newline", "--no-playlist", "--ffmpeg-location", Ffmpeg,
+                "--progress-template", "download:P:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress._downloaded_bytes_str)s|%(progress._total_bytes_str)s",
+                "--print", "after_move:F:%(filepath)s", "-P", outputDir };
+
+            var browser = BrowserCookie();
+            if (!string.IsNullOrEmpty(browser)) { args.Add("--cookies-from-browser"); args.Add(browser); }
+
+            var mode = Mode();
+            if (mode == "original") args.AddRange(new[] { "-f", "bv*+ba/b", "-o", "%(title)s [%(id)s].%(ext)s" });
+            else if (mode == "mp3") args.AddRange(new[] { "-x", "--audio-format", "mp3", "--audio-quality", "0", "-o", "%(title)s [%(id)s].%(ext)s" });
+            else args.AddRange(new[] { "-f", "bv*[height<=1080]+ba/b[height<=1080]", "--merge-output-format", "mp4", "-o", mode == "x" ? "%(title)s [%(id)s].SOURCE.%(ext)s" : "%(title)s [%(id)s].%(ext)s" });
+
+            if (TrimCheck.IsChecked == true)
+            {
+                args.Add("--download-sections");
+                args.Add("*" + (string.IsNullOrWhiteSpace(TrimStart.Text) ? "0" : TrimStart.Text.Trim()) + "-" + (string.IsNullOrWhiteSpace(TrimEnd.Text) ? "inf" : TrimEnd.Text.Trim()));
+                args.Add("--force-keyframes-at-cuts");
+            }
+            args.Add(mediaUrl);
+
+            var errors = new StringBuilder();
+            string finalPath = "";
+            var rc = await RunProcess(YtDlp, args, (line, isErr) =>
+            {
+                if (isErr) { lock (errors) errors.AppendLine(line); return; }
+                if (line.StartsWith("F:")) { finalPath = line[2..].Trim(); return; }
+                if (!line.StartsWith("P:")) return;
+                var parts = line[2..].Split('|');
+                var pctText = parts.ElementAtOrDefault(0)?.Replace("%", "").Trim();
+                if (double.TryParse(pctText, NumberStyles.Any, CultureInfo.InvariantCulture, out var pct))
+                {
+                    var value = Math.Clamp((int)Math.Round(pct), 0, 100);
+                    Dispatcher.UIThread.Post(() => { Progress.Value = value; StatusText.Text = $"Downloading — {value}%"; });
+                }
+                var speed = Clean(parts.ElementAtOrDefault(1)); var eta = Clean(parts.ElementAtOrDefault(2));
+                var got = Clean(parts.ElementAtOrDefault(3)); var total = Clean(parts.ElementAtOrDefault(4));
+                var info = new List<string>(); if (speed != "") info.Add(speed); if (eta != "") info.Add("ETA " + eta); if (got != "" && total != "") info.Add(got + " / " + total);
+                Dispatcher.UIThread.Post(() => ProgressText.Text = info.Count == 0 ? "Downloading media..." : string.Join("  •  ", info));
+            });
+
+            if (rc != 0) throw new Exception("yt-dlp failed:\n\n" + Tail(errors.ToString(), 2200));
+            if (string.IsNullOrWhiteSpace(finalPath)) throw new Exception("Download completed but the output path was not reported.");
+
+            if (mode == "x")
+            {
+                finalPath = await ConvertForX(finalPath);
+            }
+
+            lastOutput = finalPath;
+            Progress.Value = 100;
+            StatusText.Text = "Done — 100%";
+            ProgressText.Text = Path.GetFileName(finalPath);
+            OpenFolderButton.IsEnabled = true;
+        }
+        catch (Exception ex)
+        {
+            Progress.Value = 0;
+            StatusText.Text = "Failed";
+            ProgressText.Text = "The task did not complete.";
+            await ShowInfo(ex.Message);
+        }
+        finally { SetBusy(false); }
+    }
+
+    async Task<string> ConvertForX(string source)
+    {
+        var target = XTarget(source);
+        var duration = await DurationSeconds(source);
+        Dispatcher.UIThread.Post(() => { Progress.Value = 0; StatusText.Text = "Optimizing for X — 0%"; ProgressText.Text = duration > 0 ? "00:00 / " + FormatDuration(duration) : "Starting FFmpeg..."; });
+
+        var errors = new StringBuilder();
+        var args = new[] { "-y", "-hide_banner", "-loglevel", "error", "-i", source, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "medium", "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p", "-vf", "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease", "-fpsmax", "30", "-crf", "20", "-maxrate", "8M", "-bufsize", "16M", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", "-f", "mp4", target };
+
+        var rc = await RunProcess(Ffmpeg, args, (line, isErr) =>
+        {
+            if (isErr) { lock (errors) errors.AppendLine(line); return; }
+            if (!line.StartsWith("out_time=")) return;
+            if (!TimeSpan.TryParse(line[9..].Trim(), CultureInfo.InvariantCulture, out var current)) return;
+            var pct = duration > 0 ? Math.Clamp((int)Math.Round(current.TotalSeconds / duration * 100), 0, 99) : 0;
+            Dispatcher.UIThread.Post(() => { if (duration > 0) { Progress.Value = pct; StatusText.Text = $"Optimizing for X — {pct}%"; ProgressText.Text = FormatDuration(current.TotalSeconds) + " / " + FormatDuration(duration); } else ProgressText.Text = "Processed " + FormatDuration(current.TotalSeconds); });
+        });
+
+        if (rc != 0) throw new Exception("FFmpeg conversion failed:\n\n" + Tail(errors.ToString(), 1800));
+        try { if (File.Exists(source) && !source.Equals(target, StringComparison.OrdinalIgnoreCase)) File.Delete(source); } catch { }
+        return target;
+    }
+
+    async Task<double> DurationSeconds(string file)
+    {
+        if (!File.Exists(Ffprobe)) return 0;
+        try
+        {
+            var value = (await CaptureOutput(Ffprobe, new[] { "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", file })).Trim();
+            return double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : 0;
+        }
+        catch { return 0; }
+    }
+
+    string XTarget(string source)
+    {
+        var stem = Path.GetFileNameWithoutExtension(source);
+        if (stem.EndsWith(".SOURCE", StringComparison.OrdinalIgnoreCase)) stem = stem[..^7];
+        return Path.Combine(Path.GetDirectoryName(source)!, stem + "_X.mp4");
+    }
+
+    async Task RefreshYtDlpVersions(bool pop)
+    {
+        try
+        {
+            if (!File.Exists(YtDlp)) { InstalledYtDlp.Text = "Installed yt-dlp: missing"; LatestYtDlp.Text = "Latest: unknown"; return; }
+            var installed = (await CaptureOutput(YtDlp, new[] { "--version" })).Trim();
+            var latest = await LatestYtDlpVersion();
+            InstalledYtDlp.Text = "Installed yt-dlp: " + installed;
+            LatestYtDlp.Text = "Latest: " + latest;
+            if (pop) await ShowInfo(installed.TrimStart('v') == latest.TrimStart('v') ? "yt-dlp is up to date." : $"yt-dlp update available: {installed} → {latest}");
+        }
+        catch (Exception ex) { LatestYtDlp.Text = "Latest: check failed"; if (pop) await ShowInfo(ex.Message); }
+    }
+
+    static async Task<string> LatestYtDlpVersion()
+    {
+        using var http = new HttpClient();
+        http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SAPGUN-Media-Grabber", AppVersion));
+        using var stream = await http.GetStreamAsync("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest");
+        using var json = await JsonDocument.ParseAsync(stream);
+        return json.RootElement.GetProperty("tag_name").GetString() ?? "unknown";
+    }
+
+    async Task<string> CaptureOutput(string exe, IEnumerable<string> args)
+    {
+        var output = new StringBuilder(); var errors = new StringBuilder();
+        var rc = await RunProcess(exe, args, (line, err) => { lock (err ? errors : output) (err ? errors : output).AppendLine(line); });
+        if (rc != 0) throw new Exception(Path.GetFileName(exe) + " returned " + rc + "\n" + Tail(errors.ToString(), 800));
+        return output.ToString();
+    }
+
+    static async Task<int> RunProcess(string exe, IEnumerable<string> args, Action<string, bool> onLine)
+    {
+        var psi = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var arg in args) psi.ArgumentList.Add(arg);
+        using var process = new Process { StartInfo = psi };
+        process.Start();
+        var stdout = Task.Run(async () => { string? line; while ((line = await process.StandardOutput.ReadLineAsync()) != null) onLine(line, false); });
+        var stderr = Task.Run(async () => { string? line; while ((line = await process.StandardError.ReadLineAsync()) != null) onLine(line, true); });
+        await process.WaitForExitAsync();
+        await Task.WhenAll(stdout, stderr);
+        return process.ExitCode;
+    }
+
+    void SetBusy(bool busy) => DownloadButton.IsEnabled = !busy;
+    static string Clean(string? value) => string.IsNullOrWhiteSpace(value) || value is "NA" or "N/A" or "Unknown" ? "" : value.Trim();
+    static string Tail(string value, int max) => value.Length <= max ? value : value[^max..];
+    static string FormatDuration(double seconds) { var t = TimeSpan.FromSeconds(Math.Max(0, seconds)); return t.TotalHours >= 1 ? $"{(int)t.TotalHours:00}:{t.Minutes:00}:{t.Seconds:00}" : $"{(int)t.TotalMinutes:00}:{t.Seconds:00}"; }
+
+    void OpenTarget(string target)
+    {
+        if (string.IsNullOrWhiteSpace(target)) return;
+        try
+        {
+            if (OperatingSystem.IsMacOS()) Process.Start("open", new[] { target });
+            else if (OperatingSystem.IsLinux()) Process.Start("xdg-open", new[] { target });
+            else Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    async Task ShowInfo(string message)
+    {
+        var dialog = new Window { Title = "SAPGUN Media Grabber", Width = 520, SizeToContent = SizeToContent.Height, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var close = new Button { Content = "OK", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, MinWidth = 90 };
+        close.Click += (_, _) => dialog.Close();
+        dialog.Content = new StackPanel { Margin = new Thickness(20), Spacing = 16, Children = { new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, close } };
+        await dialog.ShowDialog(this);
+    }
+}
