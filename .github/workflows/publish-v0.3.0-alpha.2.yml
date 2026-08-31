@@ -1,0 +1,123 @@
+# Manual-only publisher for v0.3.0-alpha.2.
+# This workflow NEVER runs on push. It only creates a GitHub prerelease
+# when dispatched with confirm=publish-alpha.2 and two already-green CI run IDs.
+name: Publish v0.3.0-alpha.2 Prerelease
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type publish-alpha.2 to create the GitHub prerelease'
+        required: true
+        type: string
+      linux_run_id:
+        description: 'Successful run ID of "Linux x64 v0.3.0 Alpha" that uploaded linux-x64-alpha artifacts'
+        required: true
+        type: string
+      macos_run_id:
+        description: 'Successful run ID of "macOS Apple Silicon v0.3.0 Alpha" that uploaded macos-arm64-alpha artifacts'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require explicit confirmation
+        run: |
+          if [ "${{ inputs.confirm }}" != "publish-alpha.2" ]; then
+            echo "Refusing to publish. Dispatch again with confirm=publish-alpha.2"
+            exit 1
+          fi
+
+  publish-prerelease:
+    needs: guard
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download validated Linux CI artifacts
+        run: |
+          mkdir -p release
+          gh run download "${{ inputs.linux_run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            -n SAPGUN-Media-Grabber-linux-x64-alpha \
+            -D release
+
+      - name: Download validated macOS CI artifacts
+        run: |
+          gh run download "${{ inputs.macos_run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            -n SAPGUN-Media-Grabber-macos-arm64-alpha \
+            -D release
+
+      - name: Verify expected alpha.2 filenames
+        run: |
+          ls -lah release
+          test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-x64.tar.gz
+          test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-arm64.tar.gz
+          test -f release/SHA256SUMS-linux-x64.txt
+          test -f release/SHA256SUMS-macos-arm64.txt
+          echo '--- Linux checksum ---'
+          cat release/SHA256SUMS-linux-x64.txt
+          echo '--- macOS checksum ---'
+          cat release/SHA256SUMS-macos-arm64.txt
+
+      - name: Write release notes
+        run: |
+          cat > release-notes.md <<'EOF'
+          # SAPGUN Media Grabber v0.3.0-alpha.2
+
+          Cross-platform prerelease focused on **application update checking**.
+
+          The APP updater and the yt-dlp ENGINE updater are separate.
+
+          ## App updates
+
+          - Check App Update against GitHub Releases
+          - Stable vs Prerelease channels (alpha builds default to Prerelease)
+          - Strict platform asset matching
+          - SHA-256 verification when a digest or SHA256SUMS file is published
+          - Never silent-installs
+          - Windows: download installer → verify → launch installer after confirmation → quit
+          - Linux / macOS: download matching tar.gz → verify → reveal in Downloads
+
+          ## Linux x64 — Alpha
+
+          Download: `SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-x64.tar.gz`
+
+          Extract and run:
+          `./app/sapgun-media-grabber`
+
+          ## macOS Apple Silicon — Experimental / Beta
+
+          Download: `SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-arm64.tar.gz`
+
+          Unsigned / not notarized. Finder, Gatekeeper, and cookies still need real-user testing.
+          This updater does **not** replace the `.app` automatically.
+
+          ## Important
+
+          - **Windows remains the stable release line (v0.2.2).** This prerelease does not replace Latest.
+          - Local processing only; no cloud converter.
+          - Built on yt-dlp + FFmpeg. Third-party components retain their own licenses.
+          EOF
+
+      - name: Create GitHub prerelease
+        env:
+          TAG: v0.3.0-alpha.2
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Refusing to clobber automatically."
+            exit 1
+          fi
+          gh release create "$TAG" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title 'SAPGUN Media Grabber v0.3.0-alpha.2' \
+            --notes-file release-notes.md \
+            --prerelease

@@ -43,6 +43,8 @@ jobs:
         run: dotnet build crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -c Release --no-restore
 
       - name: Test app-update logic
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: dotnet test crossplatform/SAPGUN.MediaGrabber.Tests/SAPGUN.MediaGrabber.Tests.csproj -c Release --no-restore
 
       - name: Resolve app version
