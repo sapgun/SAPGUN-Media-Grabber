@@ -30,7 +30,7 @@ VersionInfoVersion={#MyAppVersionInfo}
 VersionInfoCompany=SAPGUN
 VersionInfoDescription=Local yt-dlp + FFmpeg GUI (Avalonia)
 VersionInfoProductName={#MyAppName}
-VersionInfoProductVersion={#MyAppVersion}
+VersionInfoProductVersion={#MyAppVersionInfo}
 
 [Files]
 Source: "..\dist\windows-x64\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
