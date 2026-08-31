@@ -132,9 +132,35 @@ jobs:
             dist/linux-x64/app/install-desktop.sh
           grep -F "$(pwd)/dist/linux-x64/app/sapgun-media-grabber" \
             /tmp/sapgun-desktop-smoke/.local/share/applications/sapgun-media-grabber.desktop
+          dist/linux-x64/app/tools/ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx264
+          dist/linux-x64/app/tools/ffmpeg -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
           test -x dist/linux-x64/app/tools/yt-dlp
           test -x dist/linux-x64/app/tools/ffmpeg
           test -x dist/linux-x64/app/tools/ffprobe
+
+      - name: X-ready MP4 codec smoke test
+        run: |
+          TOOLS=dist/linux-x64/app/tools
+          "$TOOLS/ffmpeg" -y -hide_banner -loglevel error \
+            -f lavfi -i 'testsrc=size=1280x720:rate=30' \
+            -f lavfi -i 'sine=frequency=1000:sample_rate=48000' \
+            -t 3 -c:v libx264 -pix_fmt yuv420p -c:a aac /tmp/source.mp4
+
+          "$TOOLS/ffmpeg" -y -hide_banner -loglevel error -i /tmp/source.mp4 \
+            -map 0:v:0 -map '0:a:0?' \
+            -c:v libx264 -preset medium -profile:v high -level 4.1 \
+            -pix_fmt yuv420p -vf "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease" \
+            -fpsmax 30 -crf 20 -maxrate 8M -bufsize 16M \
+            -c:a aac -b:a 192k -ar 48000 -ac 2 -movflags +faststart \
+            /tmp/x-ready.mp4
+
+          VCODEC=$("$TOOLS/ffprobe" -v error -select_streams v:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          PIXFMT=$("$TOOLS/ffprobe" -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          ACODEC=$("$TOOLS/ffprobe" -v error -select_streams a:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          echo "video=$VCODEC pix_fmt=$PIXFMT audio=$ACODEC"
+          test "$VCODEC" = "h264"
+          test "$PIXFMT" = "yuv420p"
+          test "$ACODEC" = "aac"
 
       - name: GUI launch smoke test under Xvfb
         run: |

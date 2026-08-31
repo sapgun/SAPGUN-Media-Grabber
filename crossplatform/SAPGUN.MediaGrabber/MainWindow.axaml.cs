@@ -401,7 +401,7 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() => { Progress.Value = 0; StatusText.Text = "Optimizing for X — 0%"; ProgressText.Text = duration > 0 ? "00:00 / " + FormatDuration(duration) : "Starting FFmpeg..."; });
 
         var errors = new StringBuilder();
-        var args = new[] { "-y", "-hide_banner", "-loglevel", "error", "-i", source, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "medium", "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p", "-vf", "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease", "-fpsmax", "30", "-crf", "20", "-maxrate", "8M", "-bufsize", "16M", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", "-f", "mp4", target };
+        var args = XReadyEncode.ConversionArgs(source, target);
 
         var rc = await RunProcess(Ffmpeg, args, (line, isErr) =>
         {
