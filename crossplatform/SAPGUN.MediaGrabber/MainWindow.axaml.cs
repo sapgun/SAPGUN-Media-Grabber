@@ -117,31 +117,8 @@ public partial class MainWindow : Window
     string Ffmpeg => Path.Combine(toolsDir, ToolName("ffmpeg"));
     string Ffprobe => Path.Combine(toolsDir, ToolName("ffprobe"));
 
-    void SeedBundledTools()
-    {
-        var seed = Path.Combine(AppContext.BaseDirectory, "tools");
-        if (!Directory.Exists(seed)) return;
-        foreach (var name in new[] { ToolName("yt-dlp"), ToolName("ffmpeg"), ToolName("ffprobe") })
-        {
-            var source = Path.Combine(seed, name);
-            var target = Path.Combine(toolsDir, name);
-            if (File.Exists(source) && !File.Exists(target)) File.Copy(source, target);
-            EnsureExecutable(target);
-        }
-    }
-
-    static void EnsureExecutable(string path)
-    {
-        if (OperatingSystem.IsWindows() || !File.Exists(path)) return;
-        try
-        {
-            File.SetUnixFileMode(path,
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-        }
-        catch { }
-    }
+    void SeedBundledTools() =>
+        BundledToolSeeder.Seed(Path.Combine(AppContext.BaseDirectory, "tools"), toolsDir);
 
     async void Paste_Click(object? sender, RoutedEventArgs e)
     {

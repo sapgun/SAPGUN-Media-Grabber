@@ -179,6 +179,15 @@ jobs:
           tar -C dist/linux-x64 -czf dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.tar.gz app
           sha256sum dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.tar.gz | tee dist/SHA256SUMS-linux-x64.txt
 
+      - name: Build Linux x64 AppImage
+        run: |
+          chmod +x crossplatform/packaging/linux/build-appimage.sh
+          crossplatform/packaging/linux/build-appimage.sh \
+            dist/linux-x64/app \
+            dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.AppImage \
+            x86_64
+          sha256sum dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.AppImage | tee dist/SHA256SUMS-linux-x64-appimage.txt
+
       - name: Upload Linux alpha artifact
         uses: actions/upload-artifact@v4
         with:
@@ -186,4 +195,6 @@ jobs:
           path: |
             dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-linux-x64.tar.gz
             dist/SHA256SUMS-linux-x64.txt
+            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-linux-x64.AppImage
+            dist/SHA256SUMS-linux-x64-appimage.txt
           if-no-files-found: error
