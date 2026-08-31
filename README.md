@@ -77,6 +77,8 @@ The native arm64 build now passes CI on an Apple Silicon GitHub Actions runner, 
 
 A public **v0.3.0-alpha.1** macOS arm64 archive is on GitHub Releases (prerelease). The in-app updater looks for `SAPGUN-Media-Grabber-vX.Y.Z-macos-arm64.tar.gz` plus `SHA256SUMS-macos-arm64.txt`.
 
+Newer alpha tarballs also include `README-MACOS.txt` and `remove-quarantine.sh`. The app is **not signed**. Prefer right-click → Open; the script only clears the quarantine xattr if Gatekeeper still blocks launch.
+
 The macOS build is still **alpha**. Finder launch, Gatekeeper behavior, browser-cookie UX, signing and notarization should be verified with real users before a stable release. This updater **downloads and reveals** the archive; it does not replace the `.app` automatically.
 
 ## Quick use

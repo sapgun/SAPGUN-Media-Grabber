@@ -184,8 +184,14 @@ jobs:
 
       - name: Package macOS Apple Silicon alpha
         run: |
+          cp crossplatform/packaging/macos/README-MACOS.txt dist/macos-arm64/README-MACOS.txt
+          cp crossplatform/packaging/macos/remove-quarantine.sh dist/macos-arm64/remove-quarantine.sh
+          chmod +x dist/macos-arm64/remove-quarantine.sh
+          test -f dist/macos-arm64/README-MACOS.txt
+          test -x dist/macos-arm64/remove-quarantine.sh
           cd dist/macos-arm64
-          tar -czf ../SAPGUN-Media-Grabber-v${APP_VERSION}-macos-arm64.tar.gz 'SAPGUN Media Grabber.app'
+          tar -czf ../SAPGUN-Media-Grabber-v${APP_VERSION}-macos-arm64.tar.gz \
+            'SAPGUN Media Grabber.app' README-MACOS.txt remove-quarantine.sh
           cd ..
           shasum -a 256 SAPGUN-Media-Grabber-v${APP_VERSION}-macos-arm64.tar.gz | tee SHA256SUMS-macos-arm64.txt
 
