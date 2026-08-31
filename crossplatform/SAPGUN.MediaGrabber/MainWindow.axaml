@@ -6,7 +6,7 @@
         WindowStartupLocation="CenterScreen">
   <ScrollViewer>
     <StackPanel Margin="28" Spacing="12">
-      <TextBlock Text="LOCAL  •  yt-dlp + FFmpeg  •  macOS / Linux" FontSize="12" Foreground="#7EA4FF" FontWeight="Bold"/>
+      <TextBlock x:Name="PlatformBanner" Text="LOCAL  •  yt-dlp + FFmpeg" FontSize="12" Foreground="#7EA4FF" FontWeight="Bold"/>
       <TextBlock Text="SAPGUN Media Grabber" FontSize="30" FontWeight="Bold"/>
       <TextBlock Text="Paste a URL. Pick a profile. Download locally." Opacity="0.72"/>
 
@@ -25,15 +25,8 @@
       </StackPanel>
 
       <TextBlock Text="BROWSER COOKIES" Margin="0,10,0,0" FontWeight="Bold"/>
-      <ComboBox x:Name="CookieBox" SelectedIndex="0">
-        <ComboBoxItem Content="None (public media)"/>
-        <ComboBoxItem Content="Safari"/>
-        <ComboBoxItem Content="Chrome"/>
-        <ComboBoxItem Content="Firefox"/>
-        <ComboBoxItem Content="Brave"/>
-        <ComboBoxItem Content="Edge"/>
-      </ComboBox>
-      <TextBlock Text="403 / sign-in errors? Pick the browser where you are already signed in." FontSize="12" Opacity="0.65"/>
+      <ComboBox x:Name="CookieBox"/>
+      <TextBlock x:Name="CookieHint" Text="403 / sign-in errors? Pick the browser where you are already signed in." FontSize="12" Opacity="0.65" TextWrapping="Wrap"/>
 
       <CheckBox x:Name="TrimCheck" Content="Trim / download a section" Margin="0,8,0,0"/>
       <Grid ColumnDefinitions="*,40,*" ColumnSpacing="4">

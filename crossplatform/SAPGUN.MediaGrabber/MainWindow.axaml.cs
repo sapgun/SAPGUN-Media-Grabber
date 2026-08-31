@@ -38,6 +38,8 @@ public partial class MainWindow : Window
     RadioButton OriginalProfile => this.FindControl<RadioButton>("OriginalProfile")!;
     RadioButton Mp4Profile => this.FindControl<RadioButton>("Mp4Profile")!;
     ComboBox CookieBox => this.FindControl<ComboBox>("CookieBox")!;
+    TextBlock CookieHint => this.FindControl<TextBlock>("CookieHint")!;
+    TextBlock PlatformBanner => this.FindControl<TextBlock>("PlatformBanner")!;
     Button DownloadButton => this.FindControl<Button>("DownloadButton")!;
     Button OpenFolderButton => this.FindControl<Button>("OpenFolderButton")!;
     Button ThemeButton => this.FindControl<Button>("ThemeButton")!;
@@ -74,6 +76,8 @@ public partial class MainWindow : Window
         lightMode = LoadTheme();
         ApplyTheme();
         Title = "SAPGUN Media Grabber v" + AppVersionInfo.Current;
+        PlatformBanner.Text = "LOCAL  •  yt-dlp + FFmpeg  •  " + PlatformDetector.DisplayName(PlatformDetector.Detect()) + "  •  v" + AppVersionInfo.Current;
+        FillCookieBrowsers();
         AppCurrentVersion.Text = "Current: v" + AppVersionInfo.Current;
         UpdateChannelBox.SelectedIndex = LoadChannel() == UpdateChannel.Stable ? 1 : 0;
         UpdateChannelBox.SelectionChanged += (_, _) => SaveChannel();
@@ -293,10 +297,22 @@ public partial class MainWindow : Window
 
     string Mode() => OriginalProfile.IsChecked == true ? "original" : Mp4Profile.IsChecked == true ? "mp4" : this.FindControl<RadioButton>("Mp3Profile")!.IsChecked == true ? "mp3" : "x";
 
+    void FillCookieBrowsers()
+    {
+        var platform = PlatformDetector.Detect();
+        CookieBox.Items.Clear();
+        foreach (var browser in CookieBrowsers.ForCurrentOs())
+            CookieBox.Items.Add(new ComboBoxItem { Content = browser.Label, Tag = browser.Id });
+        CookieBox.SelectedIndex = 0;
+        CookieHint.Text = CookieBrowsers.Hint(platform);
+    }
+
     string? BrowserCookie()
     {
         if (CookieBox.SelectedIndex <= 0) return null;
-        return (CookieBox.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant();
+        if (CookieBox.SelectedItem is ComboBoxItem item && item.Tag is string id && !string.IsNullOrWhiteSpace(id))
+            return id;
+        return null;
     }
 
     async Task StartDownload()
