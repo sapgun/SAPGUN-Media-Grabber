@@ -7,7 +7,8 @@ public static class UpdateAssetSelector
 {
     public const string WindowsInstallerName = "SAPGUN-Media-Grabber-Setup.exe";
 
-    static readonly Regex LinuxPackage = new(@"^SAPGUN-Media-Grabber-v.+-linux-x64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    static readonly Regex LinuxX64Package = new(@"^SAPGUN-Media-Grabber-v.+-linux-x64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    static readonly Regex LinuxArm64Package = new(@"^SAPGUN-Media-Grabber-v.+-linux-arm64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     static readonly Regex MacosArm64Package = new(@"^SAPGUN-Media-Grabber-v.+-macos-arm64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     static readonly Regex MacosX64Package = new(@"^SAPGUN-Media-Grabber-v.+-macos-x64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     static readonly Regex WindowsZipPackage = new(@"^SAPGUN-Media-Grabber-v.+-windows-x64\.zip$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -87,6 +88,7 @@ public static class UpdateAssetSelector
         {
             PlatformDetector.WinX64 => ExpectedWindowsZipName(tag),
             PlatformDetector.LinuxX64 => $"SAPGUN-Media-Grabber-{tag}-linux-x64.tar.gz",
+            PlatformDetector.LinuxArm64 => $"SAPGUN-Media-Grabber-{tag}-linux-arm64.tar.gz",
             PlatformDetector.OsxArm64 => $"SAPGUN-Media-Grabber-{tag}-macos-arm64.tar.gz",
             PlatformDetector.OsxX64 => $"SAPGUN-Media-Grabber-{tag}-macos-x64.tar.gz",
             _ => ""
@@ -104,6 +106,7 @@ public static class UpdateAssetSelector
     {
         PlatformDetector.WinX64 => "SHA256SUMS-win-x64.txt",
         PlatformDetector.LinuxX64 => "SHA256SUMS-linux-x64.txt",
+        PlatformDetector.LinuxArm64 => "SHA256SUMS-linux-arm64.txt",
         PlatformDetector.OsxArm64 => "SHA256SUMS-macos-arm64.txt",
         PlatformDetector.OsxX64 => "SHA256SUMS-macos-x64.txt",
         _ => null
@@ -115,7 +118,8 @@ public static class UpdateAssetSelector
         return platform switch
         {
             PlatformDetector.WinX64 => string.Equals(name, expectedName, StringComparison.Ordinal) || string.Equals(name, WindowsInstallerName, StringComparison.Ordinal),
-            PlatformDetector.LinuxX64 => LinuxPackage.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
+            PlatformDetector.LinuxX64 => LinuxX64Package.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
+            PlatformDetector.LinuxArm64 => LinuxArm64Package.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
             PlatformDetector.OsxArm64 => MacosArm64Package.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
             PlatformDetector.OsxX64 => MacosX64Package.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
             _ => false

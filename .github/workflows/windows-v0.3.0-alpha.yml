@@ -153,7 +153,7 @@ jobs:
           if (-not (Test-Path $path)) { throw "missing $path" }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
           $sums = Join-Path 'dist' 'SHA256SUMS-win-x64.txt'
-          Set-Content -LiteralPath $sums -Value "$hash  $name" -Encoding utf8
+          [System.IO.File]::WriteAllText((Join-Path (Get-Location) $sums), "${hash}  ${name}`n")
           Get-Content $sums
 
       - name: Upload Windows alpha artifact

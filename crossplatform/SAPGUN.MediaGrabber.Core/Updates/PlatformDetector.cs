@@ -6,6 +6,7 @@ public static class PlatformDetector
 {
     public const string WinX64 = "win-x64";
     public const string LinuxX64 = "linux-x64";
+    public const string LinuxArm64 = "linux-arm64";
     public const string OsxArm64 = "osx-arm64";
     public const string OsxX64 = "osx-x64";
 
@@ -14,6 +15,7 @@ public static class PlatformDetector
         var arch = RuntimeInformation.OSArchitecture;
         if (OperatingSystem.IsWindows() && arch == Architecture.X64) return WinX64;
         if (OperatingSystem.IsLinux() && arch == Architecture.X64) return LinuxX64;
+        if (OperatingSystem.IsLinux() && arch == Architecture.Arm64) return LinuxArm64;
         if (OperatingSystem.IsMacOS() && arch == Architecture.Arm64) return OsxArm64;
         if (OperatingSystem.IsMacOS() && arch == Architecture.X64) return OsxX64;
 
@@ -26,7 +28,7 @@ public static class PlatformDetector
     }
 
     public static bool IsSupported(string platform) =>
-        platform is WinX64 or LinuxX64 or OsxArm64 or OsxX64;
+        platform is WinX64 or LinuxX64 or LinuxArm64 or OsxArm64 or OsxX64;
 
     public static UpdateApplyAction ApplyAction(string platform) =>
         platform == WinX64 ? UpdateApplyAction.LaunchInstallerAndExit : UpdateApplyAction.RevealDownload;
@@ -35,6 +37,7 @@ public static class PlatformDetector
     {
         WinX64 => "Windows x64",
         LinuxX64 => "Linux x64",
+        LinuxArm64 => "Linux arm64",
         OsxArm64 => "macOS Apple Silicon",
         OsxX64 => "macOS Intel",
         _ => platform

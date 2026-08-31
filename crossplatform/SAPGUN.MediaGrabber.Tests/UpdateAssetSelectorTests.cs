@@ -37,6 +37,21 @@ public class UpdateAssetSelectorTests
     }
 
     [Fact]
+    public void SelectsLinuxArm64TarballAndChecksum()
+    {
+        var selected = UpdateAssetSelector.Select(Release(
+            Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-arm64.tar.gz", "sha256:" + new string('a', 64)),
+            Asset("SHA256SUMS-linux-arm64.txt"),
+            Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-x64.tar.gz")),
+            PlatformDetector.LinuxArm64);
+
+        Assert.NotNull(selected);
+        Assert.Equal("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-arm64.tar.gz", selected!.Package.Name);
+        Assert.Equal("SHA256SUMS-linux-arm64.txt", selected.ChecksumFile?.Name);
+        Assert.Equal(UpdateApplyAction.RevealDownload, selected.ApplyAction);
+    }
+
+    [Fact]
     public void SelectsMacosArm64Tarball()
     {
         var selected = UpdateAssetSelector.Select(Release(

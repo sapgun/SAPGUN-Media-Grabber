@@ -6,12 +6,8 @@ public static class CookieBrowsers
 {
     public static readonly CookieBrowser None = new("", "None (public media)");
 
-    public static IReadOnlyList<CookieBrowser> ForCurrentOs()
-    {
-        if (OperatingSystem.IsMacOS()) return ForPlatform(PlatformDetector.Detect());
-        if (OperatingSystem.IsWindows()) return ForPlatform(PlatformDetector.WinX64);
-        return ForPlatform(PlatformDetector.LinuxX64);
-    }
+    public static IReadOnlyList<CookieBrowser> ForCurrentOs() =>
+        ForPlatform(PlatformDetector.Detect());
 
     public static IReadOnlyList<CookieBrowser> ForPlatform(string platform)
     {
