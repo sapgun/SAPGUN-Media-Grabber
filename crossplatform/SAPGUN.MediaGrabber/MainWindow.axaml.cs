@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     readonly string toolsDir;
     readonly string settingsFile;
     readonly string channelFile;
+    readonly string folderFile;
     readonly HttpClient http = CreateHttp();
     readonly AppUpdateService appUpdates;
 
@@ -67,11 +68,11 @@ public partial class MainWindow : Window
         settingsFile = Path.Combine(dataDir, "theme.txt");
         channelFile = Path.Combine(dataDir, "update-channel.txt");
         appUpdates = new AppUpdateService(http);
+        folderFile = Path.Combine(dataDir, "folder.txt");
         Directory.CreateDirectory(toolsDir);
         SeedBundledTools();
 
-        var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-        FolderBox.Text = Directory.Exists(downloads) ? downloads : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        FolderBox.Text = LoadFolder();
 
         lightMode = LoadTheme();
         ApplyTheme();
@@ -132,7 +133,11 @@ public partial class MainWindow : Window
     async void Browse_Click(object? sender, RoutedEventArgs e)
     {
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Choose download folder", AllowMultiple = false });
-        if (folders.Count > 0) FolderBox.Text = folders[0].Path.LocalPath;
+        if (folders.Count > 0)
+        {
+            FolderBox.Text = folders[0].Path.LocalPath;
+            SaveFolder();
+        }
     }
 
     async void Download_Click(object? sender, RoutedEventArgs e) => await StartDownload();
@@ -156,6 +161,32 @@ public partial class MainWindow : Window
     void SaveChannel()
     {
         try { File.WriteAllText(channelFile, SelectedChannel() == UpdateChannel.Stable ? "stable" : "prerelease"); }
+        catch { }
+    }
+
+    string LoadFolder()
+    {
+        var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        var fallback = Directory.Exists(downloads) ? downloads : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        try
+        {
+            if (File.Exists(folderFile))
+            {
+                var saved = File.ReadAllText(folderFile).Trim();
+                if (saved != "" && Directory.Exists(saved)) return saved;
+            }
+        }
+        catch { }
+        return fallback;
+    }
+
+    void SaveFolder()
+    {
+        try
+        {
+            var path = (FolderBox.Text ?? "").Trim();
+            if (path != "" && Directory.Exists(path)) File.WriteAllText(folderFile, path);
+        }
         catch { }
     }
 
@@ -383,6 +414,7 @@ public partial class MainWindow : Window
             StatusText.Text = "Done — 100%";
             ProgressText.Text = Path.GetFileName(finalPath);
             OpenFolderButton.IsEnabled = true;
+            SaveFolder();
         }
         catch (Exception ex)
         {
