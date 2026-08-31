@@ -1,0 +1,4 @@
+{
+  "name": "SAPGUN Media Grabber",
+  "install": "bash .cursor/install.sh"
+}
