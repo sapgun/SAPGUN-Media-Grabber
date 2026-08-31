@@ -59,7 +59,11 @@ public static class UpdateAssetSelector
                 installer = asset;
             }
         }
-        return zip ?? installer;
+
+        // Stable / Latest Windows upgrades use Setup.exe. Prerelease keeps the portable zip first.
+        if (release.Prerelease)
+            return zip ?? installer;
+        return installer ?? zip;
     }
 
     static GitHubAsset? SelectNamedPackage(GitHubRelease release, string platform)

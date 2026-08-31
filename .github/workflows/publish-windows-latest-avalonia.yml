@@ -1,0 +1,109 @@
+# Manual-only: make Avalonia Setup.exe the GitHub Latest Windows download.
+# Does NOT run on push. Does not touch Linux/macOS prereleases.
+name: Publish Windows Latest (Avalonia 0.3 UI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type make-windows-latest to replace GitHub Latest Setup.exe'
+        required: true
+        type: string
+      windows_run_id:
+        description: 'Successful run ID of "Windows x64 v0.3.0 Alpha" that uploaded Setup.exe'
+        required: true
+        type: string
+      tag:
+        description: 'Stable tag to publish as Latest (must not be a prerelease tag)'
+        required: true
+        type: string
+        default: 'v0.3.0'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require explicit confirmation
+        run: |
+          if [ "${{ inputs.confirm }}" != "make-windows-latest" ]; then
+            echo "Refusing. Dispatch again with confirm=make-windows-latest"
+            exit 1
+          fi
+          TAG="${{ inputs.tag }}"
+          case "$TAG" in
+            *alpha*|*beta*|*rc*)
+              echo "Refusing prerelease-style tag $TAG for Latest"
+              exit 1
+              ;;
+          esac
+
+  publish-latest:
+    needs: guard
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download validated Windows CI artifacts
+        run: |
+          mkdir -p release
+          gh run download "${{ inputs.windows_run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            -n SAPGUN-Media-Grabber-windows-x64-alpha \
+            -D release
+          ls -lah release
+          test -f release/SAPGUN-Media-Grabber-Setup.exe
+          test -f release/SHA256SUMS-win-setup.txt
+          test ! -e release/SAPGUN-Media-Grabber-v0.2.2-unused
+          echo '--- Setup checksum ---'
+          cat release/SHA256SUMS-win-setup.txt
+
+      - name: Resolve source commit of the Windows build
+        id: src
+        run: |
+          SHA=$(gh run view "${{ inputs.windows_run_id }}" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Windows build commit $SHA"
+
+      - name: Write release notes
+        run: |
+          cat > release-notes.md <<'EOF'
+          # SAPGUN Media Grabber Windows Latest — Avalonia 0.3 UI
+
+          This **Latest** Windows installer is the Avalonia 0.3 UI, not the older WinForms window.
+
+          Download: `SAPGUN-Media-Grabber-Setup.exe`
+
+          It uses the same AppId as v0.2.2, so it upgrades the existing per-user install.
+
+          Linux and macOS builds stay on prerelease tags. This release is Windows Setup.exe (+ checksum). A portable zip may also be attached if it was in the CI artifact.
+
+          Local processing only. Built on yt-dlp + FFmpeg.
+          EOF
+
+      - name: Create GitHub Latest release
+        run: |
+          TAG="${{ inputs.tag }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Refusing to clobber automatically."
+            exit 1
+          fi
+          FILES=(release/SAPGUN-Media-Grabber-Setup.exe release/SHA256SUMS-win-setup.txt)
+          if [ -f release/SAPGUN-Media-Grabber-v*-windows-x64.zip ]; then
+            FILES+=(release/*.zip release/SHA256SUMS-win-x64.txt)
+          fi
+          gh release create "$TAG" \
+            release/SAPGUN-Media-Grabber-Setup.exe \
+            release/SHA256SUMS-win-setup.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "${{ steps.src.outputs.sha }}" \
+            --title "SAPGUN Media Grabber $TAG" \
+            --notes-file release-notes.md
+          # Attach portable zip when present without failing if names vary.
+          if ls release/SAPGUN-Media-Grabber-v*-windows-x64.zip >/dev/null 2>&1; then
+            gh release upload "$TAG" release/SAPGUN-Media-Grabber-v*-windows-x64.zip release/SHA256SUMS-win-x64.txt \
+              --repo "$GITHUB_REPOSITORY"
+          fi

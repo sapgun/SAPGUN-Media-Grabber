@@ -58,9 +58,49 @@ public static class AppUpdateEvaluator
             };
         }
 
-        var latest = candidates.OrderByDescending(c => c.Version).First();
-        var notes = TruncateNotes(latest.Release.Body);
-        if (latest.Version < current)
+        var ranked = candidates.OrderByDescending(c => c.Version).ToList();
+        var withAsset = ranked
+            .Select(c => (c.Release, c.Version, Asset: UpdateAssetSelector.Select(c.Release, platform)))
+            .FirstOrDefault(c => c.Asset != null);
+
+        if (withAsset.Release is null)
+        {
+            var newest = ranked[0];
+            var notes = TruncateNotes(newest.Release.Body);
+            if (newest.Version < current)
+            {
+                return new UpdateCheckResult
+                {
+                    Status = UpdateCheckStatus.CurrentIsNewerThanChannel,
+                    CurrentVersion = current.ToString(),
+                    Channel = channel,
+                    Platform = platform,
+                    LatestVersion = newest.Version.ToString(),
+                    LatestIsPrerelease = newest.Release.Prerelease || newest.Version.IsPrerelease,
+                    ReleaseNotes = notes,
+                    ReleaseUrl = newest.Release.HtmlUrl,
+                    Message = channel == UpdateChannel.Stable
+                        ? $"You are on {current} which is newer than the latest stable release ({newest.Version}). Stay on the Prerelease channel to receive alpha/beta builds."
+                        : $"This build ({current}) is newer than the latest listed release ({newest.Version})."
+                };
+            }
+
+            return new UpdateCheckResult
+            {
+                Status = UpdateCheckStatus.NoCompatibleAsset,
+                CurrentVersion = current.ToString(),
+                Channel = channel,
+                Platform = platform,
+                LatestVersion = newest.Version.ToString(),
+                LatestIsPrerelease = newest.Release.Prerelease || newest.Version.IsPrerelease,
+                ReleaseNotes = notes,
+                ReleaseUrl = newest.Release.HtmlUrl,
+                Message = $"{newest.Version} is available, but it does not include a {PlatformDetector.DisplayName(platform)} package."
+            };
+        }
+
+        var notesForAsset = TruncateNotes(withAsset.Release.Body);
+        if (withAsset.Version < current)
         {
             return new UpdateCheckResult
             {
@@ -68,17 +108,17 @@ public static class AppUpdateEvaluator
                 CurrentVersion = current.ToString(),
                 Channel = channel,
                 Platform = platform,
-                LatestVersion = latest.Version.ToString(),
-                LatestIsPrerelease = latest.Release.Prerelease || latest.Version.IsPrerelease,
-                ReleaseNotes = notes,
-                ReleaseUrl = latest.Release.HtmlUrl,
+                LatestVersion = withAsset.Version.ToString(),
+                LatestIsPrerelease = withAsset.Release.Prerelease || withAsset.Version.IsPrerelease,
+                ReleaseNotes = notesForAsset,
+                ReleaseUrl = withAsset.Release.HtmlUrl,
                 Message = channel == UpdateChannel.Stable
-                    ? $"You are on {current} which is newer than the latest stable release ({latest.Version}). Stay on the Prerelease channel to receive alpha/beta builds."
-                    : $"This build ({current}) is newer than the latest listed release ({latest.Version})."
+                    ? $"You are on {current} which is newer than the latest stable release ({withAsset.Version}). Stay on the Prerelease channel to receive alpha/beta builds."
+                    : $"This build ({current}) is newer than the latest listed release ({withAsset.Version})."
             };
         }
 
-        if (latest.Version.CompareTo(current) == 0)
+        if (withAsset.Version.CompareTo(current) == 0)
         {
             return new UpdateCheckResult
             {
@@ -86,28 +126,11 @@ public static class AppUpdateEvaluator
                 CurrentVersion = current.ToString(),
                 Channel = channel,
                 Platform = platform,
-                LatestVersion = latest.Version.ToString(),
-                LatestIsPrerelease = latest.Release.Prerelease || latest.Version.IsPrerelease,
-                ReleaseNotes = notes,
-                ReleaseUrl = latest.Release.HtmlUrl,
+                LatestVersion = withAsset.Version.ToString(),
+                LatestIsPrerelease = withAsset.Release.Prerelease || withAsset.Version.IsPrerelease,
+                ReleaseNotes = notesForAsset,
+                ReleaseUrl = withAsset.Release.HtmlUrl,
                 Message = "SAPGUN Media Grabber is up to date."
-            };
-        }
-
-        var asset = UpdateAssetSelector.Select(latest.Release, platform);
-        if (asset is null)
-        {
-            return new UpdateCheckResult
-            {
-                Status = UpdateCheckStatus.NoCompatibleAsset,
-                CurrentVersion = current.ToString(),
-                Channel = channel,
-                Platform = platform,
-                LatestVersion = latest.Version.ToString(),
-                LatestIsPrerelease = latest.Release.Prerelease || latest.Version.IsPrerelease,
-                ReleaseNotes = notes,
-                ReleaseUrl = latest.Release.HtmlUrl,
-                Message = $"{latest.Version} is available, but it does not include a {PlatformDetector.DisplayName(platform)} package."
             };
         }
 
@@ -117,12 +140,12 @@ public static class AppUpdateEvaluator
             CurrentVersion = current.ToString(),
             Channel = channel,
             Platform = platform,
-            LatestVersion = latest.Version.ToString(),
-            LatestIsPrerelease = latest.Release.Prerelease || latest.Version.IsPrerelease,
-            ReleaseNotes = notes,
-            ReleaseUrl = latest.Release.HtmlUrl,
-            Asset = asset,
-            Message = $"Update available: {current} → {latest.Version}."
+            LatestVersion = withAsset.Version.ToString(),
+            LatestIsPrerelease = withAsset.Release.Prerelease || withAsset.Version.IsPrerelease,
+            ReleaseNotes = notesForAsset,
+            ReleaseUrl = withAsset.Release.HtmlUrl,
+            Asset = withAsset.Asset,
+            Message = $"Update available: {current} → {withAsset.Version}."
         };
     }
 

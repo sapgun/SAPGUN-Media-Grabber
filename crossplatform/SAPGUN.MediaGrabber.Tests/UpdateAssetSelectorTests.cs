@@ -12,11 +12,13 @@ public class UpdateAssetSelectorTests
         Digest = digest
     };
 
-    static GitHubRelease Release(params GitHubAsset[] assets) => new()
+    static GitHubRelease Release(params GitHubAsset[] assets) => Release(prerelease: true, assets);
+
+    static GitHubRelease Release(bool prerelease, params GitHubAsset[] assets) => new()
     {
         TagName = "v0.3.0-alpha.2",
         HtmlUrl = "https://github.com/sapgun/SAPGUN-Media-Grabber/releases/tag/v0.3.0-alpha.2",
-        Prerelease = true,
+        Prerelease = prerelease,
         Assets = assets
     };
 
@@ -101,6 +103,20 @@ public class UpdateAssetSelectorTests
         Assert.Equal("SAPGUN-Media-Grabber-v0.3.0-alpha.2-windows-x64.zip", selected!.Package.Name);
         Assert.Equal("SHA256SUMS-win-x64.txt", selected.ChecksumFile?.Name);
         Assert.Equal(UpdateApplyAction.RevealDownload, selected.ApplyAction);
+    }
+
+    [Fact]
+    public void PrefersWindowsInstallerOnStableRelease()
+    {
+        var selected = UpdateAssetSelector.Select(Release(prerelease: false,
+            Asset("SAPGUN-Media-Grabber-Setup.exe"),
+            Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-windows-x64.zip", "sha256:" + new string('a', 64)),
+            Asset("SHA256SUMS-win-x64.txt")),
+            PlatformDetector.WinX64);
+
+        Assert.NotNull(selected);
+        Assert.Equal(UpdateAssetSelector.WindowsInstallerName, selected!.Package.Name);
+        Assert.Equal(UpdateApplyAction.LaunchInstallerAndExit, selected.ApplyAction);
     }
 
     [Fact]

@@ -101,7 +101,6 @@ jobs:
           test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-arm64.tar.gz
           test -f release/SHA256SUMS-linux-x64.txt
           test -f release/SHA256SUMS-macos-arm64.txt
-          test ! -e release/SAPGUN-Media-Grabber-Setup.exe
           echo '--- Linux checksum ---'
           cat release/SHA256SUMS-linux-x64.txt
           echo '--- macOS checksum ---'

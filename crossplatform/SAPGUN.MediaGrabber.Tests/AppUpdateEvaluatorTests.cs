@@ -75,6 +75,32 @@ public class AppUpdateEvaluatorTests
     }
 
     [Fact]
+    public void LinuxSkipsNewerWindowsOnlyStableRelease()
+    {
+        var result = AppUpdateEvaluator.Evaluate("0.3.0-alpha.1", UpdateChannel.Prerelease, PlatformDetector.LinuxX64, new[]
+        {
+            Rel("v0.3.0", false, false, "SAPGUN-Media-Grabber-Setup.exe"),
+            Rel("v0.3.0-alpha.1", true, false, "SAPGUN-Media-Grabber-v0.3.0-alpha.1-linux-x64.tar.gz", "SHA256SUMS-linux-x64.txt")
+        });
+        Assert.Equal(UpdateCheckStatus.UpToDate, result.Status);
+        Assert.False(result.CanDownload);
+    }
+
+    [Fact]
+    public void StableWindowsPicksNewerAvaloniaInstaller()
+    {
+        var result = AppUpdateEvaluator.Evaluate("0.2.2", UpdateChannel.Stable, PlatformDetector.WinX64, new[]
+        {
+            Rel("v0.3.0", false, false, "SAPGUN-Media-Grabber-Setup.exe", "SAPGUN-Media-Grabber-v0.3.0-windows-x64.zip"),
+            Rel("v0.2.2", false, false, "SAPGUN-Media-Grabber-Setup.exe")
+        });
+        Assert.Equal(UpdateCheckStatus.UpdateAvailable, result.Status);
+        Assert.Equal("0.3.0", result.LatestVersion);
+        Assert.Equal(UpdateAssetSelector.WindowsInstallerName, result.Asset!.Package.Name);
+        Assert.Equal(UpdateApplyAction.LaunchInstallerAndExit, result.Asset.ApplyAction);
+    }
+
+    [Fact]
     public void MissingPlatformAssetIsNotDownloadable()
     {
         var result = AppUpdateEvaluator.Evaluate("0.3.0-alpha.1", UpdateChannel.Prerelease, PlatformDetector.WinX64, new[]
