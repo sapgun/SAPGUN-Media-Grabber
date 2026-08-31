@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Headers;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Avalonia;
@@ -11,18 +10,24 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using SapgunMediaGrabber.Updates;
 
 namespace SapgunMediaGrabber;
 
 public partial class MainWindow : Window
 {
-    const string AppVersion = "0.3.0-alpha.1";
     const string XProfileUrl = "https://x.com/caro7370";
     const string KoFiUrl = "https://ko-fi.com/sapgun";
 
     readonly string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SAPGUN Media Grabber");
     readonly string toolsDir;
     readonly string settingsFile;
+    readonly string channelFile;
+    readonly HttpClient http = CreateHttp();
+    readonly AppUpdateService appUpdates;
+
+    UpdateCheckResult? lastAppCheck;
+    CancellationTokenSource? appDownloadCts;
 
     TextBox UrlBox => this.FindControl<TextBox>("UrlBox")!;
     TextBox FolderBox => this.FindControl<TextBox>("FolderBox")!;
@@ -41,6 +46,14 @@ public partial class MainWindow : Window
     TextBlock ProgressText => this.FindControl<TextBlock>("ProgressText")!;
     TextBlock InstalledYtDlp => this.FindControl<TextBlock>("InstalledYtDlp")!;
     TextBlock LatestYtDlp => this.FindControl<TextBlock>("LatestYtDlp")!;
+    TextBlock AppCurrentVersion => this.FindControl<TextBlock>("AppCurrentVersion")!;
+    TextBlock AppLatestVersion => this.FindControl<TextBlock>("AppLatestVersion")!;
+    TextBlock AppUpdateStatus => this.FindControl<TextBlock>("AppUpdateStatus")!;
+    ComboBox UpdateChannelBox => this.FindControl<ComboBox>("UpdateChannelBox")!;
+    Button CheckAppUpdateButton => this.FindControl<Button>("CheckAppUpdateButton")!;
+    Button DownloadAppUpdateButton => this.FindControl<Button>("DownloadAppUpdateButton")!;
+    Button CancelAppUpdateButton => this.FindControl<Button>("CancelAppUpdateButton")!;
+    ProgressBar AppUpdateProgress => this.FindControl<ProgressBar>("AppUpdateProgress")!;
 
     string lastOutput = "";
     bool lightMode;
@@ -50,6 +63,8 @@ public partial class MainWindow : Window
         AvaloniaXamlLoader.Load(this);
         toolsDir = Path.Combine(dataDir, "tools");
         settingsFile = Path.Combine(dataDir, "theme.txt");
+        channelFile = Path.Combine(dataDir, "update-channel.txt");
+        appUpdates = new AppUpdateService(http);
         Directory.CreateDirectory(toolsDir);
         SeedBundledTools();
 
@@ -58,7 +73,18 @@ public partial class MainWindow : Window
 
         lightMode = LoadTheme();
         ApplyTheme();
+        Title = "SAPGUN Media Grabber v" + AppVersionInfo.Current;
+        AppCurrentVersion.Text = "Current: v" + AppVersionInfo.Current;
+        UpdateChannelBox.SelectedIndex = LoadChannel() == UpdateChannel.Stable ? 1 : 0;
+        DownloadAppUpdateButton.Content = OperatingSystem.IsWindows() ? "Download & Install" : "Download Update";
         Opened += async (_, _) => await RefreshYtDlpVersions(false);
+    }
+
+    static HttpClient CreateHttp()
+    {
+        var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SAPGUN-Media-Grabber", AppVersionInfo.Current));
+        return client;
     }
 
     string ToolName(string baseName) => OperatingSystem.IsWindows() ? baseName + ".exe" : baseName;
@@ -108,6 +134,126 @@ public partial class MainWindow : Window
     void OpenFolder_Click(object? sender, RoutedEventArgs e) => OpenTarget(File.Exists(lastOutput) ? Path.GetDirectoryName(lastOutput)! : FolderBox.Text ?? "");
     async void CheckYtDlp_Click(object? sender, RoutedEventArgs e) => await RefreshYtDlpVersions(true);
 
+    UpdateChannel SelectedChannel() =>
+        UpdateChannelBox.SelectedIndex == 1 ? UpdateChannel.Stable : UpdateChannel.Prerelease;
+
+    UpdateChannel LoadChannel()
+    {
+        try
+        {
+            if (File.Exists(channelFile) && File.ReadAllText(channelFile).Trim().Equals("stable", StringComparison.OrdinalIgnoreCase))
+                return UpdateChannel.Stable;
+        }
+        catch { }
+        return AppVersionInfo.DefaultChannel;
+    }
+
+    void SaveChannel()
+    {
+        try { File.WriteAllText(channelFile, SelectedChannel() == UpdateChannel.Stable ? "stable" : "prerelease"); }
+        catch { }
+    }
+
+    async void CheckAppUpdate_Click(object? sender, RoutedEventArgs e)
+    {
+        SaveChannel();
+        CheckAppUpdateButton.IsEnabled = false;
+        DownloadAppUpdateButton.IsEnabled = false;
+        AppLatestVersion.Text = "Latest: checking GitHub Releases…";
+        AppUpdateStatus.Text = "Checking sapgun/SAPGUN-Media-Grabber releases…";
+        try
+        {
+            lastAppCheck = await appUpdates.CheckAsync(AppVersionInfo.Current, SelectedChannel());
+            AppLatestVersion.Text = lastAppCheck.LatestVersion is null ? "Latest: unavailable" : "Latest: v" + lastAppCheck.LatestVersion;
+            AppUpdateStatus.Text = lastAppCheck.Message;
+            DownloadAppUpdateButton.IsEnabled = lastAppCheck.CanDownload;
+            if (!string.IsNullOrWhiteSpace(lastAppCheck.ReleaseNotes) && lastAppCheck.CanDownload)
+                AppUpdateStatus.Text = lastAppCheck.Message + "\n\n" + lastAppCheck.ReleaseNotes;
+        }
+        catch (Exception ex)
+        {
+            lastAppCheck = null;
+            AppLatestVersion.Text = "Latest: check failed";
+            AppUpdateStatus.Text = ex.Message;
+        }
+        finally { CheckAppUpdateButton.IsEnabled = true; }
+    }
+
+    async void DownloadAppUpdate_Click(object? sender, RoutedEventArgs e)
+    {
+        if (lastAppCheck is not { CanDownload: true })
+        {
+            await ShowInfo("Check for an app update first.");
+            return;
+        }
+
+        appDownloadCts?.Cancel();
+        appDownloadCts = new CancellationTokenSource();
+        var destDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        Directory.CreateDirectory(destDir);
+
+        CheckAppUpdateButton.IsEnabled = false;
+        DownloadAppUpdateButton.IsEnabled = false;
+        CancelAppUpdateButton.IsVisible = true;
+        AppUpdateProgress.IsVisible = true;
+        AppUpdateProgress.Value = 0;
+        AppUpdateStatus.Text = "Downloading update… this is never installed automatically.";
+
+        try
+        {
+            var progress = new Progress<UpdateDownloadProgress>(p =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    AppUpdateProgress.Value = p.Percent;
+                    AppUpdateStatus.Text = p.TotalBytes is > 0
+                        ? $"Downloading update — {p.Percent}% ({p.BytesReceived / 1048576.0:0.0} / {p.TotalBytes.Value / 1048576.0:0.0} MB)"
+                        : $"Downloading update — {p.BytesReceived / 1048576.0:0.0} MB";
+                });
+            });
+            var downloaded = await appUpdates.DownloadAsync(lastAppCheck, destDir, progress, appDownloadCts.Token);
+            AppUpdateProgress.Value = 100;
+
+            if (!downloaded.ChecksumVerified)
+            {
+                await ShowInfo("The update downloaded, but no SHA-256 was published for this asset.\n\nFile:\n" + downloaded.FilePath + "\n\nComputed SHA-256:\n" + downloaded.Sha256 + "\n\nIt will not be launched automatically.");
+                UpdateShell.Reveal(downloaded.FilePath);
+                AppUpdateStatus.Text = "Downloaded without a published checksum. File was revealed, not installed.";
+                return;
+            }
+
+            if (downloaded.ApplyAction == UpdateApplyAction.LaunchInstallerAndExit)
+            {
+                await ShowInfo("SHA-256 verified.\n\nThe installer will open now. This app will quit so the installer can replace it.\n\nNothing is installed until you continue in the installer.");
+                UpdateShell.LaunchInstaller(downloaded.FilePath);
+                UpdateShell.ShutdownApp();
+                return;
+            }
+
+            await ShowInfo("SHA-256 verified.\n\nThe update archive was saved to:\n" + downloaded.FilePath + "\n\nExtract and replace this build yourself. The running app will not overwrite itself.");
+            UpdateShell.Reveal(downloaded.FilePath);
+            AppUpdateStatus.Text = "Verified update saved to Downloads. Extract it to replace this build.";
+        }
+        catch (OperationCanceledException)
+        {
+            AppUpdateStatus.Text = "App update download cancelled.";
+        }
+        catch (Exception ex)
+        {
+            AppUpdateStatus.Text = "App update download failed.";
+            await ShowInfo(ex.Message);
+        }
+        finally
+        {
+            CheckAppUpdateButton.IsEnabled = true;
+            DownloadAppUpdateButton.IsEnabled = lastAppCheck?.CanDownload == true;
+            CancelAppUpdateButton.IsVisible = false;
+            AppUpdateProgress.IsVisible = false;
+        }
+    }
+
+    void CancelAppUpdate_Click(object? sender, RoutedEventArgs e) => appDownloadCts?.Cancel();
+
     async void UpdateYtDlp_Click(object? sender, RoutedEventArgs e)
     {
         if (!File.Exists(YtDlp)) { await ShowInfo("yt-dlp is missing from the app tools folder."); return; }
@@ -119,7 +265,7 @@ public partial class MainWindow : Window
 
     async void Help_Click(object? sender, RoutedEventArgs e)
     {
-        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nTrim is optional. Everything is processed locally.");
+        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nAPP Check App Update looks at GitHub Releases for this application. ENGINE Check / Update yt-dlp only updates the bundled downloader. They are separate.\n\nApp updates are never installed silently. On Linux and macOS the archive is saved and revealed. On Windows the installer is launched only after you confirm.\n\nTrim is optional. Media conversion is processed locally.");
     }
 
     void Theme_Click(object? sender, RoutedEventArgs e)
@@ -276,10 +422,10 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (!File.Exists(YtDlp)) { InstalledYtDlp.Text = "Installed yt-dlp: missing"; LatestYtDlp.Text = "Latest: unknown"; return; }
+            if (!File.Exists(YtDlp)) { InstalledYtDlp.Text = "Current: missing"; LatestYtDlp.Text = "Latest: unknown"; return; }
             var installed = (await CaptureOutput(YtDlp, new[] { "--version" })).Trim();
             var latest = await LatestYtDlpVersion();
-            InstalledYtDlp.Text = "Installed yt-dlp: " + installed;
+            InstalledYtDlp.Text = "Current: " + installed;
             LatestYtDlp.Text = "Latest: " + latest;
             if (pop) await ShowInfo(installed.TrimStart('v') == latest.TrimStart('v') ? "yt-dlp is up to date." : $"yt-dlp update available: {installed} → {latest}");
         }
@@ -289,7 +435,7 @@ public partial class MainWindow : Window
     static async Task<string> LatestYtDlpVersion()
     {
         using var http = new HttpClient();
-        http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SAPGUN-Media-Grabber", AppVersion));
+        http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SAPGUN-Media-Grabber", AppVersionInfo.Current));
         using var stream = await http.GetStreamAsync("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest");
         using var json = await JsonDocument.ParseAsync(stream);
         return json.RootElement.GetProperty("tag_name").GetString() ?? "unknown";

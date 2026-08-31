@@ -1,8 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SapgunMediaGrabber.MainWindow"
-        Title="SAPGUN Media Grabber v0.3.0 alpha"
-        Width="760" Height="900" MinWidth="680" MinHeight="760"
+        Title="SAPGUN Media Grabber v0.3.0-alpha.2"
+        Width="760" Height="980" MinWidth="680" MinHeight="800"
         WindowStartupLocation="CenterScreen">
   <ScrollViewer>
     <StackPanel Margin="28" Spacing="12">
@@ -54,15 +54,39 @@
       <TextBlock x:Name="ProgressText" Text="Waiting for a download." FontSize="12" Opacity="0.72" TextWrapping="Wrap"/>
       <Button x:Name="OpenFolderButton" Content="Open Output Folder" IsEnabled="False" Click="OpenFolder_Click"/>
 
+      <Border BorderBrush="#4C6FFF" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,8,0,0">
+        <StackPanel Spacing="8">
+          <TextBlock Text="APP" FontWeight="Bold" Foreground="#7EA4FF"/>
+          <TextBlock Text="SAPGUN Media Grabber" FontWeight="Bold"/>
+          <TextBlock x:Name="AppCurrentVersion" Text="Current: …" FontSize="12"/>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+            <TextBlock Text="Channel" VerticalAlignment="Center" FontSize="12"/>
+            <ComboBox x:Name="UpdateChannelBox" Grid.Column="1" SelectedIndex="0">
+              <ComboBoxItem Content="Prerelease"/>
+              <ComboBoxItem Content="Stable"/>
+            </ComboBox>
+          </Grid>
+          <TextBlock x:Name="AppLatestVersion" Text="Latest: not checked yet" FontSize="12"/>
+          <TextBlock x:Name="AppUpdateStatus" Text="App updates are separate from yt-dlp updates. Nothing is installed automatically." FontSize="12" Opacity="0.75" TextWrapping="Wrap"/>
+          <ProgressBar x:Name="AppUpdateProgress" Minimum="0" Maximum="100" Height="10" IsVisible="False"/>
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+            <Button x:Name="CheckAppUpdateButton" Grid.Column="0" Content="Check App Update" Click="CheckAppUpdate_Click"/>
+            <Button x:Name="DownloadAppUpdateButton" Grid.Column="1" Content="Download Update" IsEnabled="False" Click="DownloadAppUpdate_Click"/>
+          </Grid>
+          <Button x:Name="CancelAppUpdateButton" Content="Cancel download" IsVisible="False" Click="CancelAppUpdate_Click"/>
+        </StackPanel>
+      </Border>
+
       <Border BorderBrush="#404652" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,8,0,0">
         <StackPanel Spacing="8">
-          <TextBlock Text="TOOLS &amp; VERSION" FontWeight="Bold"/>
+          <TextBlock Text="ENGINE" FontWeight="Bold"/>
+          <TextBlock Text="yt-dlp" FontWeight="Bold"/>
           <Grid ColumnDefinitions="*,*">
-            <TextBlock x:Name="InstalledYtDlp" Grid.Column="0" Text="Installed yt-dlp: checking..." FontSize="12"/>
+            <TextBlock x:Name="InstalledYtDlp" Grid.Column="0" Text="Current: checking..." FontSize="12"/>
             <TextBlock x:Name="LatestYtDlp" Grid.Column="1" Text="Latest: checking..." HorizontalAlignment="Right" FontSize="12"/>
           </Grid>
           <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
-            <Button Grid.Column="0" Content="Check version" Click="CheckYtDlp_Click"/>
+            <Button Grid.Column="0" Content="Check" Click="CheckYtDlp_Click"/>
             <Button Grid.Column="1" Content="Update yt-dlp" Click="UpdateYtDlp_Click"/>
             <Button Grid.Column="2" Content="How to use" Click="Help_Click"/>
           </Grid>
