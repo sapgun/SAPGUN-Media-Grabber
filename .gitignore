@@ -1,6 +1,9 @@
 build/
 dist/
+bin/
+obj/
 *.exe
 *.zip
 .vs/
-obj/
+*.user
+
