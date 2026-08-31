@@ -308,8 +308,8 @@ public partial class MainWindow : Window
 
             if (downloaded.ApplyAction == UpdateApplyAction.LaunchInstallerAndExit)
             {
-                await ShowInfo("SHA-256 verified.\n\nThe installer will open now. This app will quit so the installer can replace it.\n\nNothing is installed until you continue in the installer.");
-                UpdateShell.LaunchInstaller(downloaded.FilePath);
+                await ShowInfo("SHA-256 verified.\n\nThe installer will open now. This app will quit so files can be replaced.\n\nFinish the wizard to install. The new build should start when the installer closes.\n\nNothing is installed until you continue in the installer.");
+                UpdateShell.LaunchInstallerThenRelaunch(downloaded.FilePath);
                 UpdateShell.ShutdownApp();
                 return;
             }
@@ -349,7 +349,7 @@ public partial class MainWindow : Window
 
     async void Help_Click(object? sender, RoutedEventArgs e)
     {
-        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nCancel stops the current yt-dlp download or FFmpeg conversion and removes leftover .part files from this job.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nAPP Check App Update looks at GitHub Releases for this application. ENGINE Check / Update yt-dlp only updates the bundled downloader. They are separate.\n\nApp updates are never installed silently. Portable zip/tar.gz builds are saved and revealed. The Windows Setup.exe installer is launched only after you confirm.\n\nTrim is optional. Media conversion is processed locally.");
+        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nCancel stops the current yt-dlp download or FFmpeg conversion and removes leftover .part files from this job.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nAPP Check App Update looks at GitHub Releases for this application. ENGINE Check / Update yt-dlp only updates the bundled downloader. They are separate.\n\nApp updates are never installed silently. Portable zip/tar.gz builds are saved and revealed. The Windows Setup.exe installer is launched only after you confirm; this app quits so files can be replaced, then the new build should start when the wizard finishes.\n\nTrim is optional. Media conversion is processed locally.");
     }
 
     void Theme_Click(object? sender, RoutedEventArgs e)

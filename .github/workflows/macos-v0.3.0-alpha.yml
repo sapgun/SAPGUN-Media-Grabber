@@ -195,6 +195,16 @@ jobs:
           cd ..
           shasum -a 256 SAPGUN-Media-Grabber-v${APP_VERSION}-macos-arm64.tar.gz | tee SHA256SUMS-macos-arm64.txt
 
+      - name: Build unsigned macOS arm64 DMG
+        run: |
+          hdiutil create \
+            -volname "SAPGUN Media Grabber" \
+            -srcfolder dist/macos-arm64 \
+            -ov -format UDZO \
+            dist/SAPGUN-Media-Grabber-v${APP_VERSION}-macos-arm64.dmg
+          test -f dist/SAPGUN-Media-Grabber-v${APP_VERSION}-macos-arm64.dmg
+          shasum -a 256 dist/SAPGUN-Media-Grabber-v${APP_VERSION}-macos-arm64.dmg | tee dist/SHA256SUMS-macos-arm64-dmg.txt
+
       - name: Upload macOS alpha artifact
         uses: actions/upload-artifact@v4
         with:
@@ -202,4 +212,6 @@ jobs:
           path: |
             dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-macos-arm64.tar.gz
             dist/SHA256SUMS-macos-arm64.txt
+            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-macos-arm64.dmg
+            dist/SHA256SUMS-macos-arm64-dmg.txt
           if-no-files-found: error

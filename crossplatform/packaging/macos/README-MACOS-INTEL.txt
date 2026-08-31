@@ -12,7 +12,8 @@ macos-arm64 archive instead.
 
 Open:
 
-  1. Extract this tar.gz.
+  1. If you have the .dmg, open it and copy SAPGUN Media Grabber.app.
+     If you have the tar.gz, extract it first.
   2. Right-click SAPGUN Media Grabber.app → Open
      (unsigned alpha builds often need this once because of Gatekeeper)
   3. If macOS still blocks it, run:

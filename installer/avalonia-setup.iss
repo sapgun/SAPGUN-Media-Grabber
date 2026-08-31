@@ -46,4 +46,4 @@ Name: "{autodesktop}\SAPGUN Media Grabber"; Filename: "{app}\{#MyAppExeName}"; T
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch SAPGUN Media Grabber"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch SAPGUN Media Grabber"; Flags: nowait postinstall skipifsilent unchecked

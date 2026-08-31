@@ -195,6 +195,16 @@ jobs:
           cd ..
           shasum -a 256 SAPGUN-Media-Grabber-v${APP_VERSION}-macos-x64.tar.gz | tee SHA256SUMS-macos-x64.txt
 
+      - name: Build unsigned macOS Intel DMG
+        run: |
+          hdiutil create \
+            -volname "SAPGUN Media Grabber" \
+            -srcfolder dist/macos-x64 \
+            -ov -format UDZO \
+            dist/SAPGUN-Media-Grabber-v${APP_VERSION}-macos-x64.dmg
+          test -f dist/SAPGUN-Media-Grabber-v${APP_VERSION}-macos-x64.dmg
+          shasum -a 256 dist/SAPGUN-Media-Grabber-v${APP_VERSION}-macos-x64.dmg | tee dist/SHA256SUMS-macos-x64-dmg.txt
+
       - name: Upload macOS Intel alpha artifact
         uses: actions/upload-artifact@v4
         with:
@@ -202,4 +212,6 @@ jobs:
           path: |
             dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-macos-x64.tar.gz
             dist/SHA256SUMS-macos-x64.txt
+            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-macos-x64.dmg
+            dist/SHA256SUMS-macos-x64-dmg.txt
           if-no-files-found: error

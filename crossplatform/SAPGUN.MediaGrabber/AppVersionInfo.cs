@@ -62,6 +62,18 @@ public static class UpdateShell
         Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
     }
 
+    public static void LaunchInstallerThenRelaunch(string installerPath)
+    {
+        var appPath = WindowsInstallerRelaunch.DefaultInstalledExePath();
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = WindowsInstallerRelaunch.CmdArguments(installerPath, appPath),
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+    }
+
     public static void ShutdownApp()
     {
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
