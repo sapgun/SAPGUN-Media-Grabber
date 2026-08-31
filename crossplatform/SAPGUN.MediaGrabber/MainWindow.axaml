@@ -2,55 +2,103 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SapgunMediaGrabber.MainWindow"
         Title="SAPGUN Media Grabber v0.3.0-alpha.2"
-        Width="760" Height="980" MinWidth="680" MinHeight="800"
+        Width="780" Height="1000" MinWidth="700" MinHeight="820"
         WindowStartupLocation="CenterScreen">
   <ScrollViewer>
-    <StackPanel Margin="28" Spacing="12">
-      <TextBlock x:Name="PlatformBanner" Text="LOCAL  •  yt-dlp + FFmpeg" FontSize="12" Foreground="#7EA4FF" FontWeight="Bold"/>
-      <TextBlock Text="SAPGUN Media Grabber" FontSize="30" FontWeight="Bold"/>
-      <TextBlock Text="Paste a URL. Pick a profile. Download locally." Opacity="0.72"/>
-
-      <TextBlock Text="MEDIA URL" Margin="0,10,0,0" FontWeight="Bold"/>
-      <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-        <TextBox x:Name="UrlBox" Grid.Column="0" PlaceholderText="https://..."/>
-        <Button Grid.Column="1" Content="Paste" Click="Paste_Click" HorizontalContentAlignment="Center"/>
+    <StackPanel Margin="32,28" Spacing="14">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock x:Name="PlatformBanner" Grid.Column="0" Text="LOCAL  •  yt-dlp + FFmpeg" FontSize="12" Foreground="#7EA4FF" FontWeight="Bold" VerticalAlignment="Center"/>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Border x:Name="YtDlpBadge" Classes="badge">
+            <TextBlock x:Name="YtDlpBadgeText" Text="yt-dlp"/>
+          </Border>
+          <Border x:Name="FfmpegBadge" Classes="badge">
+            <TextBlock x:Name="FfmpegBadgeText" Text="FFmpeg"/>
+          </Border>
+        </StackPanel>
       </Grid>
 
-      <TextBlock Text="OUTPUT PROFILE" Margin="0,10,0,0" FontWeight="Bold"/>
-      <StackPanel Spacing="7">
-        <RadioButton x:Name="XProfile" GroupName="profile" IsChecked="True" Content="X / Twitter 1080p — H.264 + AAC, upload-safe"/>
-        <RadioButton x:Name="OriginalProfile" GroupName="profile" Content="Original Best — highest available quality"/>
-        <RadioButton x:Name="Mp4Profile" GroupName="profile" Content="1080p MP4 — quick MP4 download / merge"/>
-        <RadioButton x:Name="Mp3Profile" GroupName="profile" Content="Audio MP3 — high quality extraction"/>
-      </StackPanel>
+      <TextBlock Text="SAPGUN Media Grabber" FontSize="32" FontWeight="Bold"/>
+      <TextBlock Text="Fast local media capture without web converters." Opacity="0.68" FontSize="14"/>
 
-      <TextBlock Text="BROWSER COOKIES" Margin="0,10,0,0" FontWeight="Bold"/>
+      <TextBlock Text="MEDIA URL" Classes="section"/>
+      <Grid ColumnDefinitions="*,104" ColumnSpacing="8">
+        <TextBox x:Name="UrlBox" Grid.Column="0" PlaceholderText="https://www.youtube.com/watch?v=..."/>
+        <Button Grid.Column="1" Classes="secondary" Content="Paste" Click="Paste_Click"/>
+      </Grid>
+
+      <TextBlock Text="OUTPUT PROFILE" Classes="section"/>
+      <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*" ColumnSpacing="10" RowSpacing="10">
+        <Border x:Name="OriginalCard" Classes="profile-card" PointerPressed="OriginalCard_Pressed">
+          <RadioButton x:Name="OriginalProfile" GroupName="profile" IsCheckedChanged="Profile_Changed">
+            <StackPanel Spacing="2">
+              <TextBlock Text="Original Best" FontWeight="Bold"/>
+              <TextBlock Text="Highest available quality" FontSize="12" Opacity="0.62"/>
+            </StackPanel>
+          </RadioButton>
+        </Border>
+        <Border x:Name="XCard" Grid.Column="1" Classes="profile-card" PointerPressed="XCard_Pressed">
+          <RadioButton x:Name="XProfile" GroupName="profile" IsChecked="True" IsCheckedChanged="Profile_Changed">
+            <StackPanel Spacing="2">
+              <TextBlock Text="X / Twitter 1080p" FontWeight="Bold"/>
+              <TextBlock Text="H.264 + AAC, upload-safe" FontSize="12" Opacity="0.62"/>
+            </StackPanel>
+          </RadioButton>
+        </Border>
+        <Border x:Name="Mp4Card" Grid.Row="1" Classes="profile-card" PointerPressed="Mp4Card_Pressed">
+          <RadioButton x:Name="Mp4Profile" GroupName="profile" IsCheckedChanged="Profile_Changed">
+            <StackPanel Spacing="2">
+              <TextBlock Text="1080p MP4" FontWeight="Bold"/>
+              <TextBlock Text="Fast merge, no forced re-encode" FontSize="12" Opacity="0.62"/>
+            </StackPanel>
+          </RadioButton>
+        </Border>
+        <Border x:Name="Mp3Card" Grid.Row="1" Grid.Column="1" Classes="profile-card" PointerPressed="Mp3Card_Pressed">
+          <RadioButton x:Name="Mp3Profile" GroupName="profile" IsCheckedChanged="Profile_Changed">
+            <StackPanel Spacing="2">
+              <TextBlock Text="Audio MP3" FontWeight="Bold"/>
+              <TextBlock Text="Best audio to MP3" FontSize="12" Opacity="0.62"/>
+            </StackPanel>
+          </RadioButton>
+        </Border>
+      </Grid>
+
+      <TextBlock Text="BROWSER COOKIES" Classes="section"/>
       <ComboBox x:Name="CookieBox"/>
       <TextBlock x:Name="CookieHint" Text="403 / sign-in errors? Pick the browser where you are already signed in." FontSize="12" Opacity="0.65" TextWrapping="Wrap"/>
 
-      <CheckBox x:Name="TrimCheck" Content="Trim / download a section" Margin="0,8,0,0"/>
-      <Grid ColumnDefinitions="*,40,*" ColumnSpacing="4">
-        <TextBox x:Name="TrimStart" Grid.Column="0" Text="00:00"/>
-        <TextBlock Grid.Column="1" Text="→" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-        <TextBox x:Name="TrimEnd" Grid.Column="2" PlaceholderText="end, e.g. 01:15"/>
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="TRIM  OPTIONAL" Classes="section" VerticalAlignment="Center" Margin="0"/>
+        <ToggleSwitch x:Name="TrimCheck" Grid.Column="1" OffContent="" OnContent="" IsChecked="False"/>
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
+        <StackPanel>
+          <TextBlock Text="START" FontSize="11" Opacity="0.5" Margin="0,0,0,4"/>
+          <TextBox x:Name="TrimStart" Text="00:00" IsEnabled="False"/>
+        </StackPanel>
+        <TextBlock Grid.Column="1" Text="→" VerticalAlignment="Center" Opacity="0.45" Margin="0,16,0,0"/>
+        <StackPanel Grid.Column="2">
+          <TextBlock Text="END" FontSize="11" Opacity="0.5" Margin="0,0,0,4"/>
+          <TextBox x:Name="TrimEnd" PlaceholderText="00:45" IsEnabled="False"/>
+        </StackPanel>
       </Grid>
 
-      <TextBlock Text="SAVE TO" Margin="0,10,0,0" FontWeight="Bold"/>
-      <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+      <TextBlock Text="SAVE TO" Classes="section"/>
+      <Grid ColumnDefinitions="*,104" ColumnSpacing="8">
         <TextBox x:Name="FolderBox" Grid.Column="0" IsReadOnly="True"/>
-        <Button Grid.Column="1" Content="Browse" Click="Browse_Click" HorizontalContentAlignment="Center"/>
+        <Button Grid.Column="1" Classes="secondary" Content="Choose" Click="Browse_Click"/>
       </Grid>
 
-      <Grid ColumnDefinitions="*,120" ColumnSpacing="8" Margin="0,10,0,0">
-        <Button x:Name="DownloadButton" Grid.Column="0" Content="DOWNLOAD" Height="50" Background="#4C6FFF" Foreground="White" FontWeight="Bold" Click="Download_Click"/>
-        <Button x:Name="CancelJobButton" Grid.Column="1" Content="Cancel" Height="50" IsEnabled="False" Click="CancelJob_Click"/>
+      <Grid ColumnDefinitions="*,120" ColumnSpacing="8" Margin="0,8,0,0">
+        <Button x:Name="DownloadButton" Grid.Column="0" Classes="primary" Content="DOWNLOAD" Click="Download_Click"/>
+        <Button x:Name="CancelJobButton" Grid.Column="1" Classes="secondary" Content="Cancel" IsEnabled="False" Click="CancelJob_Click"/>
       </Grid>
-      <ProgressBar x:Name="Progress" Minimum="0" Maximum="100" Height="12"/>
+      <ProgressBar x:Name="Progress" Minimum="0" Maximum="100"/>
       <TextBlock x:Name="StatusText" Text="Ready" FontWeight="Bold" Foreground="#8ED7A7"/>
       <TextBlock x:Name="ProgressText" Text="Waiting for a download." FontSize="12" Opacity="0.72" TextWrapping="Wrap"/>
-      <Button x:Name="OpenFolderButton" Content="Open Output Folder" IsEnabled="False" Click="OpenFolder_Click"/>
+      <Button x:Name="OpenFolderButton" Classes="secondary" Content="Open output folder" IsEnabled="False" Click="OpenFolder_Click"/>
 
-      <Border BorderBrush="#4C6FFF" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,8,0,0">
+      <Border Classes="card" Margin="0,8,0,0" BorderBrush="#4C6FFF">
         <StackPanel Spacing="8">
           <TextBlock Text="APP" FontWeight="Bold" Foreground="#7EA4FF"/>
           <TextBlock Text="SAPGUN Media Grabber" FontWeight="Bold"/>
@@ -64,16 +112,16 @@
           </Grid>
           <TextBlock x:Name="AppLatestVersion" Text="Latest: not checked yet" FontSize="12"/>
           <TextBlock x:Name="AppUpdateStatus" Text="App updates are separate from yt-dlp updates. Nothing is installed automatically." FontSize="12" Opacity="0.75" TextWrapping="Wrap"/>
-          <ProgressBar x:Name="AppUpdateProgress" Minimum="0" Maximum="100" Height="10" IsVisible="False"/>
+          <ProgressBar x:Name="AppUpdateProgress" Minimum="0" Maximum="100" IsVisible="False"/>
           <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
-            <Button x:Name="CheckAppUpdateButton" Grid.Column="0" Content="Check App Update" Click="CheckAppUpdate_Click"/>
-            <Button x:Name="DownloadAppUpdateButton" Grid.Column="1" Content="Download Update" IsEnabled="False" Click="DownloadAppUpdate_Click"/>
+            <Button x:Name="CheckAppUpdateButton" Grid.Column="0" Classes="secondary" Content="Check App Update" Click="CheckAppUpdate_Click"/>
+            <Button x:Name="DownloadAppUpdateButton" Grid.Column="1" Classes="secondary" Content="Download Update" IsEnabled="False" Click="DownloadAppUpdate_Click"/>
           </Grid>
-          <Button x:Name="CancelAppUpdateButton" Content="Cancel download" IsVisible="False" Click="CancelAppUpdate_Click"/>
+          <Button x:Name="CancelAppUpdateButton" Classes="secondary" Content="Cancel download" IsVisible="False" Click="CancelAppUpdate_Click"/>
         </StackPanel>
       </Border>
 
-      <Border BorderBrush="#404652" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,8,0,0">
+      <Border Classes="card">
         <StackPanel Spacing="8">
           <TextBlock Text="ENGINE" FontWeight="Bold"/>
           <TextBlock Text="yt-dlp" FontWeight="Bold"/>
@@ -82,25 +130,24 @@
             <TextBlock x:Name="LatestYtDlp" Grid.Column="1" Text="Latest: checking..." HorizontalAlignment="Right" FontSize="12"/>
           </Grid>
           <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
-            <Button Grid.Column="0" Content="Check" Click="CheckYtDlp_Click"/>
-            <Button Grid.Column="1" Content="Update yt-dlp" Click="UpdateYtDlp_Click"/>
-            <Button Grid.Column="2" Content="How to use" Click="Help_Click"/>
+            <Button Grid.Column="0" Classes="secondary" Content="Check" Click="CheckYtDlp_Click"/>
+            <Button Grid.Column="1" Classes="secondary" Content="Update yt-dlp" Click="UpdateYtDlp_Click"/>
+            <Button Grid.Column="2" Classes="secondary" Content="How to use" Click="Help_Click"/>
           </Grid>
         </StackPanel>
       </Border>
 
-      <TextBlock Text="SUPPORT" Margin="0,8,0,0" FontWeight="Bold"/>
+      <TextBlock Text="SUPPORT" Classes="section"/>
       <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
-        <Button Grid.Column="0" Content="★ Star on GitHub" Click="Star_Click"/>
-        <Button Grid.Column="1" Content="Support me · Ko-fi" Click="Support_Click"/>
+        <Button Grid.Column="0" Classes="secondary" Content="★ Star on GitHub" Click="Star_Click"/>
+        <Button Grid.Column="1" Classes="secondary" Content="Support me · Ko-fi" Click="Support_Click"/>
+      </Grid>
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+        <Button x:Name="ThemeButton" Grid.Column="0" Classes="secondary" Content="Light mode" Click="Theme_Click"/>
+        <Button Grid.Column="1" Classes="secondary" Content="Feedback / DM on X" Click="Feedback_Click"/>
       </Grid>
 
-      <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
-        <Button x:Name="ThemeButton" Grid.Column="0" Content="Light mode" Click="Theme_Click"/>
-        <Button Grid.Column="1" Content="Feedback / DM on X" Click="Feedback_Click"/>
-      </Grid>
-
-      <TextBlock Text="Cross-platform preview • local processing only" HorizontalAlignment="Center" Opacity="0.55" FontSize="11" Margin="0,4,0,0"/>
+      <TextBlock Text="Local processing • no cloud converter" HorizontalAlignment="Center" Opacity="0.45" FontSize="11" Margin="0,4,0,8"/>
     </StackPanel>
   </ScrollViewer>
 </Window>

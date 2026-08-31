@@ -5,8 +5,10 @@ using System.Text;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -35,7 +37,8 @@ public partial class MainWindow : Window
     TextBox FolderBox => this.FindControl<TextBox>("FolderBox")!;
     TextBox TrimStart => this.FindControl<TextBox>("TrimStart")!;
     TextBox TrimEnd => this.FindControl<TextBox>("TrimEnd")!;
-    CheckBox TrimCheck => this.FindControl<CheckBox>("TrimCheck")!;
+    RadioButton Mp3Profile => this.FindControl<RadioButton>("Mp3Profile")!;
+    ToggleSwitch TrimCheck => this.FindControl<ToggleSwitch>("TrimCheck")!;
     RadioButton XProfile => this.FindControl<RadioButton>("XProfile")!;
     RadioButton OriginalProfile => this.FindControl<RadioButton>("OriginalProfile")!;
     RadioButton Mp4Profile => this.FindControl<RadioButton>("Mp4Profile")!;
@@ -59,6 +62,14 @@ public partial class MainWindow : Window
     Button DownloadAppUpdateButton => this.FindControl<Button>("DownloadAppUpdateButton")!;
     Button CancelAppUpdateButton => this.FindControl<Button>("CancelAppUpdateButton")!;
     ProgressBar AppUpdateProgress => this.FindControl<ProgressBar>("AppUpdateProgress")!;
+    TextBlock YtDlpBadgeText => this.FindControl<TextBlock>("YtDlpBadgeText")!;
+    TextBlock FfmpegBadgeText => this.FindControl<TextBlock>("FfmpegBadgeText")!;
+    Border YtDlpBadge => this.FindControl<Border>("YtDlpBadge")!;
+    Border FfmpegBadge => this.FindControl<Border>("FfmpegBadge")!;
+    Border OriginalCard => this.FindControl<Border>("OriginalCard")!;
+    Border XCard => this.FindControl<Border>("XCard")!;
+    Border Mp4Card => this.FindControl<Border>("Mp4Card")!;
+    Border Mp3Card => this.FindControl<Border>("Mp3Card")!;
 
     string lastOutput = "";
     bool lightMode;
@@ -85,6 +96,10 @@ public partial class MainWindow : Window
         UpdateChannelBox.SelectedIndex = LoadChannel() == UpdateChannel.Stable ? 1 : 0;
         UpdateChannelBox.SelectionChanged += (_, _) => SaveChannel();
         DownloadAppUpdateButton.Content = OperatingSystem.IsWindows() ? "Download & Install" : "Download Update";
+        TrimCheck.IsCheckedChanged += (_, _) => ApplyTrimEnabled();
+        ApplyTrimEnabled();
+        RefreshToolBadges();
+        RefreshProfileCards();
         Opened += async (_, _) => await RefreshYtDlpVersions(false);
     }
 
@@ -142,6 +157,53 @@ public partial class MainWindow : Window
         }
     }
 
+    void OriginalCard_Pressed(object? sender, PointerPressedEventArgs e) => OriginalProfile.IsChecked = true;
+    void XCard_Pressed(object? sender, PointerPressedEventArgs e) => XProfile.IsChecked = true;
+    void Mp4Card_Pressed(object? sender, PointerPressedEventArgs e) => Mp4Profile.IsChecked = true;
+    void Mp3Card_Pressed(object? sender, PointerPressedEventArgs e) => Mp3Profile.IsChecked = true;
+    void Profile_Changed(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => RefreshProfileCards();
+
+    void ApplyTrimEnabled()
+    {
+        var on = TrimCheck.IsChecked == true;
+        TrimStart.IsEnabled = on;
+        TrimEnd.IsEnabled = on;
+    }
+
+    void RefreshToolBadges()
+    {
+        StyleBadge(YtDlpBadge, YtDlpBadgeText, "yt-dlp", File.Exists(YtDlp));
+        StyleBadge(FfmpegBadge, FfmpegBadgeText, "FFmpeg", File.Exists(Ffmpeg));
+    }
+
+    void StyleBadge(Border badge, TextBlock label, string name, bool ok)
+    {
+        label.Text = ok ? name + "  ✓" : name + "  missing";
+        badge.Background = new SolidColorBrush(ok ? Color.Parse("#163528") : Color.Parse("#3A1C1C"));
+        label.Foreground = new SolidColorBrush(ok ? Color.Parse("#8ED7A7") : Color.Parse("#F0A0A0"));
+    }
+
+    void RefreshProfileCards()
+    {
+        StyleProfileCard(OriginalCard, OriginalProfile.IsChecked == true);
+        StyleProfileCard(XCard, XProfile.IsChecked == true);
+        StyleProfileCard(Mp4Card, Mp4Profile.IsChecked == true);
+        StyleProfileCard(Mp3Card, Mp3Profile.IsChecked == true);
+    }
+
+    void StyleProfileCard(Border card, bool selected)
+    {
+        if (lightMode)
+        {
+            card.Background = new SolidColorBrush(selected ? Color.Parse("#EAF0FF") : Color.Parse("#FFFFFF"));
+            card.BorderBrush = new SolidColorBrush(selected ? Color.Parse("#4C6FFF") : Color.Parse("#D8DEE8"));
+        }
+        else
+        {
+            card.Background = new SolidColorBrush(selected ? Color.Parse("#18233A") : Color.Parse("#141822"));
+            card.BorderBrush = new SolidColorBrush(selected ? Color.Parse("#4C6FFF") : Color.Parse("#2A3140"));
+        }
+    }
     async void Download_Click(object? sender, RoutedEventArgs e) => await StartDownload();
     void CancelJob_Click(object? sender, RoutedEventArgs e) => jobCts?.Cancel();
     void OpenFolder_Click(object? sender, RoutedEventArgs e) => OpenTarget(File.Exists(lastOutput) ? Path.GetDirectoryName(lastOutput)! : FolderBox.Text ?? "");
@@ -327,9 +389,14 @@ public partial class MainWindow : Window
     {
         if (Application.Current != null) Application.Current.RequestedThemeVariant = lightMode ? ThemeVariant.Light : ThemeVariant.Dark;
         ThemeButton.Content = lightMode ? "Dark mode" : "Light mode";
+        Background = new SolidColorBrush(lightMode ? Color.Parse("#F4F6FA") : Color.Parse("#0B0D12"));
+        Foreground = new SolidColorBrush(lightMode ? Color.Parse("#12141A") : Color.Parse("#F2F4F8"));
+        DownloadButton.Background = new SolidColorBrush(lightMode ? Color.Parse("#4C6FFF") : Colors.White);
+        DownloadButton.Foreground = new SolidColorBrush(lightMode ? Colors.White : Color.Parse("#0B0D12"));
+        RefreshProfileCards();
     }
 
-    string Mode() => OriginalProfile.IsChecked == true ? "original" : Mp4Profile.IsChecked == true ? "mp4" : this.FindControl<RadioButton>("Mp3Profile")!.IsChecked == true ? "mp3" : "x";
+    string Mode() => OriginalProfile.IsChecked == true ? "original" : Mp4Profile.IsChecked == true ? "mp4" : Mp3Profile.IsChecked == true ? "mp3" : "x";
 
     void FillCookieBrowsers()
     {
@@ -488,6 +555,7 @@ public partial class MainWindow : Window
             var latest = await LatestYtDlpVersion();
             InstalledYtDlp.Text = "Current: " + installed;
             LatestYtDlp.Text = "Latest: " + latest;
+            RefreshToolBadges();
             if (pop) await ShowInfo(installed.TrimStart('v') == latest.TrimStart('v') ? "yt-dlp is up to date." : $"yt-dlp update available: {installed} → {latest}");
         }
         catch (Exception ex) { LatestYtDlp.Text = "Latest: check failed"; if (pop) await ShowInfo(ex.Message); }
