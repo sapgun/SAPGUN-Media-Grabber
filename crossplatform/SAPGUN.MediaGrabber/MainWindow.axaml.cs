@@ -26,6 +26,8 @@ public partial class MainWindow : Window
     readonly string settingsFile;
     readonly string channelFile;
     readonly string folderFile;
+    readonly string cookieFile;
+    readonly string engineAutoFile;
     readonly HttpClient http = CreateHttp();
     readonly AppUpdateService appUpdates;
 
@@ -72,6 +74,7 @@ public partial class MainWindow : Window
     Border Mp3Card => this.FindControl<Border>("Mp3Card")!;
     Border AppCard => this.FindControl<Border>("AppCard")!;
     Border EngineCard => this.FindControl<Border>("EngineCard")!;
+    CheckBox AutoUpdateYtDlpCheck => this.FindControl<CheckBox>("AutoUpdateYtDlpCheck")!;
 
     string lastOutput = "";
     bool lightMode;
@@ -84,6 +87,8 @@ public partial class MainWindow : Window
         channelFile = Path.Combine(dataDir, "update-channel.txt");
         appUpdates = new AppUpdateService(http);
         folderFile = Path.Combine(dataDir, "folder.txt");
+        cookieFile = Path.Combine(dataDir, "cookies.txt");
+        engineAutoFile = Path.Combine(dataDir, "engine-auto.txt");
         Directory.CreateDirectory(toolsDir);
         SeedBundledTools();
 
@@ -94,6 +99,8 @@ public partial class MainWindow : Window
         Title = "SAPGUN Media Grabber v" + AppVersionInfo.Current;
         PlatformBanner.Text = "LOCAL  •  yt-dlp + FFmpeg  •  " + PlatformDetector.DisplayName(PlatformDetector.Detect()) + "  •  v" + AppVersionInfo.Current;
         FillCookieBrowsers();
+        AutoUpdateYtDlpCheck.IsChecked = LoadEngineAutoUpdate();
+        AutoUpdateYtDlpCheck.IsCheckedChanged += (_, _) => SaveEngineAutoUpdate();
         AppCurrentVersion.Text = "Current: v" + AppVersionInfo.Current;
         UpdateChannelBox.SelectedIndex = LoadChannel() == UpdateChannel.Stable ? 1 : 0;
         UpdateChannelBox.SelectionChanged += (_, _) => SaveChannel();
@@ -102,7 +109,15 @@ public partial class MainWindow : Window
         ApplyTrimEnabled();
         RefreshToolBadges();
         RefreshProfileCards();
-        Opened += async (_, _) => await RefreshYtDlpVersions(false);
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, UrlDragOver);
+        AddHandler(DragDrop.DropEvent, UrlDrop);
+        Opened += async (_, _) =>
+        {
+            await RefreshYtDlpVersions(false);
+            if (AutoUpdateYtDlpCheck.IsChecked == true)
+                await UpdateYtDlpAsync(quiet: true);
+        };
     }
 
     static HttpClient CreateHttp()
@@ -338,18 +353,27 @@ public partial class MainWindow : Window
 
     void CancelAppUpdate_Click(object? sender, RoutedEventArgs e) => appDownloadCts?.Cancel();
 
-    async void UpdateYtDlp_Click(object? sender, RoutedEventArgs e)
+    async void UpdateYtDlp_Click(object? sender, RoutedEventArgs e) => await UpdateYtDlpAsync(quiet: false);
+
+    async Task UpdateYtDlpAsync(bool quiet)
     {
-        if (!File.Exists(YtDlp)) { await ShowInfo("yt-dlp is missing from the app tools folder."); return; }
+        if (!File.Exists(YtDlp))
+        {
+            if (!quiet) await ShowInfo("yt-dlp is missing from the app tools folder.");
+            return;
+        }
         StatusText.Text = "Updating yt-dlp...";
         var result = await ProcessRunner.RunAsync(YtDlp, new[] { "-U" }, (_, _) => { });
         await RefreshYtDlpVersions(false);
-        await ShowInfo(result == 0 ? "yt-dlp update complete." : "yt-dlp update failed. Check your connection and try again.");
+        if (!quiet)
+            await ShowInfo(result == 0 ? "yt-dlp update complete." : "yt-dlp update failed. Check your connection and try again.");
+        else if (result != 0)
+            ProgressText.Text = "Automatic yt-dlp update failed. Use ENGINE → Update yt-dlp.";
     }
 
     async void Help_Click(object? sender, RoutedEventArgs e)
     {
-        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nCancel stops the current yt-dlp download or FFmpeg conversion and removes leftover .part files from this job.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nAPP Check App Update looks at GitHub Releases for this application. ENGINE Check / Update yt-dlp only updates the bundled downloader. They are separate.\n\nApp updates are never installed silently. Portable zip/tar.gz builds are saved and revealed. The Windows Setup.exe installer is launched only after you confirm; this app quits so files can be replaced, then the new build should start when the wizard finishes.\n\nTrim is optional. Media conversion is processed locally.");
+        await ShowInfo("Paste or drop a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nCancel stops the current yt-dlp download or FFmpeg conversion and removes leftover .part files from this job.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nAPP Check App Update looks at GitHub Releases for this application. ENGINE Check / Update yt-dlp only updates the bundled downloader. They are separate. Auto-update yt-dlp never installs an app update.\n\nApp updates are never installed silently. Portable zip/tar.gz builds are saved and revealed. The Windows Setup.exe installer is launched only after you confirm; this app quits so files can be replaced, then the new build should start when the wizard finishes.\n\nTrim is optional. Media conversion is processed locally.");
     }
 
     void Theme_Click(object? sender, RoutedEventArgs e)
@@ -409,9 +433,65 @@ public partial class MainWindow : Window
         CookieBox.Items.Clear();
         foreach (var browser in CookieBrowsers.ForCurrentOs())
             CookieBox.Items.Add(new ComboBoxItem { Content = browser.Label, Tag = browser.Id });
-        CookieBox.SelectedIndex = 0;
+        CookieBox.SelectedIndex = LoadCookieIndex();
+        CookieBox.SelectionChanged += (_, _) => SaveCookie();
         CookieHint.Text = CookieBrowsers.Hint(platform);
     }
+
+    int LoadCookieIndex()
+    {
+        try
+        {
+            if (!File.Exists(cookieFile)) return 0;
+            var saved = File.ReadAllText(cookieFile).Trim();
+            for (var i = 0; i < CookieBox.Items.Count; i++)
+            {
+                if (CookieBox.Items[i] is ComboBoxItem item && item.Tag is string id && string.Equals(id, saved, StringComparison.Ordinal))
+                    return i;
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    void SaveCookie()
+    {
+        try
+        {
+            var id = BrowserCookie() ?? "";
+            File.WriteAllText(cookieFile, id);
+        }
+        catch { }
+    }
+
+    bool LoadEngineAutoUpdate()
+    {
+        try { return File.Exists(engineAutoFile) && File.ReadAllText(engineAutoFile).Trim().Equals("on", StringComparison.OrdinalIgnoreCase); }
+        catch { return false; }
+    }
+
+    void SaveEngineAutoUpdate()
+    {
+        try { File.WriteAllText(engineAutoFile, AutoUpdateYtDlpCheck.IsChecked == true ? "on" : "off"); }
+        catch { }
+    }
+
+    void UrlDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = HasHttpUrl(e) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    void UrlDrop(object? sender, DragEventArgs e)
+    {
+        var url = MediaUrlDrop.FirstHttpUrl(e.DataTransfer?.TryGetText());
+        if (!string.IsNullOrWhiteSpace(url))
+            UrlBox.Text = url;
+        e.Handled = true;
+    }
+
+    static bool HasHttpUrl(DragEventArgs e) =>
+        MediaUrlDrop.FirstHttpUrl(e.DataTransfer?.TryGetText()) != null;
 
     string? BrowserCookie()
     {

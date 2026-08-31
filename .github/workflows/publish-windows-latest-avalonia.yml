@@ -1,6 +1,10 @@
 # Manual-only: make Avalonia Setup.exe the GitHub Latest Windows download.
-# Does NOT run on push. Does not touch Linux/macOS prereleases.
+# GitHub only lists this workflow in the Actions tab after the file exists on
+# the repository default branch (main). It still NEVER runs on push.
+# Dispatch with confirm=make-windows-latest plus a green Windows CI run ID.
+# Does not touch Linux/macOS prereleases.
 name: Publish Windows Latest (Avalonia 0.3 UI)
+run-name: Manual Windows Latest (${{ inputs.tag }})
 
 on:
   workflow_dispatch:

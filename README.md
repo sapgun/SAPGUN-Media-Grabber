@@ -152,6 +152,10 @@ The current stable Windows artifact is:
 
 Linux and macOS artifacts will be added to the same release flow as the v0.3.0 line matures.
 
+### Maintainer: show “Publish Windows Latest” in Actions
+
+GitHub only lists **workflow_dispatch** workflows that exist on the **default branch (`main`)**. The publish job in this 0.3 branch is invisible in the Actions tab until that YAML is also on `main`. It still never runs on push; it only publishes when dispatched with `confirm=make-windows-latest`.
+
 ### Windows SmartScreen
 
 Early unsigned open-source releases may trigger a Windows SmartScreen reputation warning. Source code and the GitHub Actions build workflow are public so users can inspect how the installer is produced. Code signing can be added later if distribution volume justifies it.

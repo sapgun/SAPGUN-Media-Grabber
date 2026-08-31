@@ -23,7 +23,7 @@
 
       <TextBlock Text="MEDIA URL" Classes="section"/>
       <Grid ColumnDefinitions="*,108" ColumnSpacing="8">
-        <TextBox x:Name="UrlBox" Grid.Column="0" PlaceholderText="https://www.youtube.com/watch?v=..."/>
+        <TextBox x:Name="UrlBox" Grid.Column="0" PlaceholderText="https://www.youtube.com/watch?v=...  (or drop a link here)"/>
         <Button Grid.Column="1" Classes="secondary" Content="Paste" Click="Paste_Click"/>
       </Grid>
 
@@ -135,6 +135,7 @@
               <Button Grid.Column="1" Classes="secondary" Content="Update yt-dlp" Click="UpdateYtDlp_Click"/>
               <Button Grid.Column="2" Classes="secondary" Content="How to use" Click="Help_Click"/>
             </Grid>
+            <CheckBox x:Name="AutoUpdateYtDlpCheck" Content="Auto-update yt-dlp when the app starts"/>
           </StackPanel>
         </Border>
       </Expander>
