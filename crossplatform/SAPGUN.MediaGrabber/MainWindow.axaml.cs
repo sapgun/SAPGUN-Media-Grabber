@@ -29,6 +29,7 @@ public partial class MainWindow : Window
 
     UpdateCheckResult? lastAppCheck;
     CancellationTokenSource? appDownloadCts;
+    CancellationTokenSource? jobCts;
 
     TextBox UrlBox => this.FindControl<TextBox>("UrlBox")!;
     TextBox FolderBox => this.FindControl<TextBox>("FolderBox")!;
@@ -42,6 +43,7 @@ public partial class MainWindow : Window
     TextBlock CookieHint => this.FindControl<TextBlock>("CookieHint")!;
     TextBlock PlatformBanner => this.FindControl<TextBlock>("PlatformBanner")!;
     Button DownloadButton => this.FindControl<Button>("DownloadButton")!;
+    Button CancelJobButton => this.FindControl<Button>("CancelJobButton")!;
     Button OpenFolderButton => this.FindControl<Button>("OpenFolderButton")!;
     Button ThemeButton => this.FindControl<Button>("ThemeButton")!;
     ProgressBar Progress => this.FindControl<ProgressBar>("Progress")!;
@@ -141,6 +143,7 @@ public partial class MainWindow : Window
     }
 
     async void Download_Click(object? sender, RoutedEventArgs e) => await StartDownload();
+    void CancelJob_Click(object? sender, RoutedEventArgs e) => jobCts?.Cancel();
     void OpenFolder_Click(object? sender, RoutedEventArgs e) => OpenTarget(File.Exists(lastOutput) ? Path.GetDirectoryName(lastOutput)! : FolderBox.Text ?? "");
     async void CheckYtDlp_Click(object? sender, RoutedEventArgs e) => await RefreshYtDlpVersions(true);
 
@@ -294,14 +297,14 @@ public partial class MainWindow : Window
     {
         if (!File.Exists(YtDlp)) { await ShowInfo("yt-dlp is missing from the app tools folder."); return; }
         StatusText.Text = "Updating yt-dlp...";
-        var result = await RunProcess(YtDlp, new[] { "-U" }, (_, _) => { });
+        var result = await ProcessRunner.RunAsync(YtDlp, new[] { "-U" }, (_, _) => { });
         await RefreshYtDlpVersions(false);
         await ShowInfo(result == 0 ? "yt-dlp update complete." : "yt-dlp update failed. Check your connection and try again.");
     }
 
     async void Help_Click(object? sender, RoutedEventArgs e)
     {
-        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nAPP Check App Update looks at GitHub Releases for this application. ENGINE Check / Update yt-dlp only updates the bundled downloader. They are separate.\n\nApp updates are never installed silently. On Linux and macOS the archive is saved and revealed. On Windows the installer is launched only after you confirm.\n\nTrim is optional. Media conversion is processed locally.");
+        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nCancel stops the current yt-dlp download or FFmpeg conversion.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nAPP Check App Update looks at GitHub Releases for this application. ENGINE Check / Update yt-dlp only updates the bundled downloader. They are separate.\n\nApp updates are never installed silently. On Linux and macOS the archive is saved and revealed. On Windows the installer is launched only after you confirm.\n\nTrim is optional. Media conversion is processed locally.");
     }
 
     void Theme_Click(object? sender, RoutedEventArgs e)
@@ -355,6 +358,9 @@ public partial class MainWindow : Window
         if (!File.Exists(YtDlp) || !File.Exists(Ffmpeg)) { await ShowInfo("Platform tools are missing. Reinstall this build or use a release that bundles yt-dlp + FFmpeg."); return; }
 
         SetBusy(true);
+        jobCts?.Cancel();
+        jobCts = new CancellationTokenSource();
+        var ct = jobCts.Token;
         Progress.Value = 0;
         StatusText.Text = "Downloading — 0%";
         ProgressText.Text = "Starting yt-dlp...";
@@ -383,7 +389,7 @@ public partial class MainWindow : Window
 
             var errors = new StringBuilder();
             string finalPath = "";
-            var rc = await RunProcess(YtDlp, args, (line, isErr) =>
+            var rc = await ProcessRunner.RunAsync(YtDlp, args, (line, isErr) =>
             {
                 if (isErr) { lock (errors) errors.AppendLine(line); return; }
                 if (line.StartsWith("F:")) { finalPath = line[2..].Trim(); return; }
@@ -399,14 +405,14 @@ public partial class MainWindow : Window
                 var got = Clean(parts.ElementAtOrDefault(3)); var total = Clean(parts.ElementAtOrDefault(4));
                 var info = new List<string>(); if (speed != "") info.Add(speed); if (eta != "") info.Add("ETA " + eta); if (got != "" && total != "") info.Add(got + " / " + total);
                 Dispatcher.UIThread.Post(() => ProgressText.Text = info.Count == 0 ? "Downloading media..." : string.Join("  •  ", info));
-            });
+            }, ct);
 
             if (rc != 0) throw new Exception("yt-dlp failed:\n\n" + Tail(errors.ToString(), 2200));
             if (string.IsNullOrWhiteSpace(finalPath)) throw new Exception("Download completed but the output path was not reported.");
 
             if (mode == "x")
             {
-                finalPath = await ConvertForX(finalPath);
+                finalPath = await ConvertForX(finalPath, ct);
             }
 
             lastOutput = finalPath;
@@ -415,6 +421,12 @@ public partial class MainWindow : Window
             ProgressText.Text = Path.GetFileName(finalPath);
             OpenFolderButton.IsEnabled = true;
             SaveFolder();
+        }
+        catch (OperationCanceledException)
+        {
+            Progress.Value = 0;
+            StatusText.Text = "Cancelled";
+            ProgressText.Text = "The download or conversion was stopped.";
         }
         catch (Exception ex)
         {
@@ -426,7 +438,7 @@ public partial class MainWindow : Window
         finally { SetBusy(false); }
     }
 
-    async Task<string> ConvertForX(string source)
+    async Task<string> ConvertForX(string source, CancellationToken cancellationToken)
     {
         var target = XTarget(source);
         var duration = await DurationSeconds(source);
@@ -435,14 +447,14 @@ public partial class MainWindow : Window
         var errors = new StringBuilder();
         var args = XReadyEncode.ConversionArgs(source, target);
 
-        var rc = await RunProcess(Ffmpeg, args, (line, isErr) =>
+        var rc = await ProcessRunner.RunAsync(Ffmpeg, args, (line, isErr) =>
         {
             if (isErr) { lock (errors) errors.AppendLine(line); return; }
             if (!line.StartsWith("out_time=")) return;
             if (!TimeSpan.TryParse(line[9..].Trim(), CultureInfo.InvariantCulture, out var current)) return;
             var pct = duration > 0 ? Math.Clamp((int)Math.Round(current.TotalSeconds / duration * 100), 0, 99) : 0;
             Dispatcher.UIThread.Post(() => { if (duration > 0) { Progress.Value = pct; StatusText.Text = $"Optimizing for X — {pct}%"; ProgressText.Text = FormatDuration(current.TotalSeconds) + " / " + FormatDuration(duration); } else ProgressText.Text = "Processed " + FormatDuration(current.TotalSeconds); });
-        });
+        }, cancellationToken);
 
         if (rc != 0) throw new Exception("FFmpeg conversion failed:\n\n" + Tail(errors.ToString(), 1800));
         try { if (File.Exists(source) && !source.Equals(target, StringComparison.OrdinalIgnoreCase)) File.Delete(source); } catch { }
@@ -493,25 +505,16 @@ public partial class MainWindow : Window
     async Task<string> CaptureOutput(string exe, IEnumerable<string> args)
     {
         var output = new StringBuilder(); var errors = new StringBuilder();
-        var rc = await RunProcess(exe, args, (line, err) => { lock (err ? errors : output) (err ? errors : output).AppendLine(line); });
+        var rc = await ProcessRunner.RunAsync(exe, args, (line, err) => { lock (err ? errors : output) (err ? errors : output).AppendLine(line); });
         if (rc != 0) throw new Exception(Path.GetFileName(exe) + " returned " + rc + "\n" + Tail(errors.ToString(), 800));
         return output.ToString();
     }
 
-    static async Task<int> RunProcess(string exe, IEnumerable<string> args, Action<string, bool> onLine)
+    void SetBusy(bool busy)
     {
-        var psi = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in args) psi.ArgumentList.Add(arg);
-        using var process = new Process { StartInfo = psi };
-        process.Start();
-        var stdout = Task.Run(async () => { string? line; while ((line = await process.StandardOutput.ReadLineAsync()) != null) onLine(line, false); });
-        var stderr = Task.Run(async () => { string? line; while ((line = await process.StandardError.ReadLineAsync()) != null) onLine(line, true); });
-        await process.WaitForExitAsync();
-        await Task.WhenAll(stdout, stderr);
-        return process.ExitCode;
+        DownloadButton.IsEnabled = !busy;
+        CancelJobButton.IsEnabled = busy;
     }
-
-    void SetBusy(bool busy) => DownloadButton.IsEnabled = !busy;
     static string Clean(string? value) => string.IsNullOrWhiteSpace(value) || value is "NA" or "N/A" or "Unknown" ? "" : value.Trim();
     static string Tail(string value, int max) => value.Length <= max ? value : value[^max..];
     static string FormatDuration(double seconds) { var t = TimeSpan.FromSeconds(Math.Max(0, seconds)); return t.TotalHours >= 1 ? $"{(int)t.TotalHours:00}:{t.Minutes:00}:{t.Seconds:00}" : $"{(int)t.TotalMinutes:00}:{t.Seconds:00}"; }

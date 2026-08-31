@@ -12,7 +12,7 @@
 
       <TextBlock Text="MEDIA URL" Margin="0,10,0,0" FontWeight="Bold"/>
       <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-        <TextBox x:Name="UrlBox" Grid.Column="0" Watermark="https://..."/>
+        <TextBox x:Name="UrlBox" Grid.Column="0" PlaceholderText="https://..."/>
         <Button Grid.Column="1" Content="Paste" Click="Paste_Click" HorizontalContentAlignment="Center"/>
       </Grid>
 
@@ -32,7 +32,7 @@
       <Grid ColumnDefinitions="*,40,*" ColumnSpacing="4">
         <TextBox x:Name="TrimStart" Grid.Column="0" Text="00:00"/>
         <TextBlock Grid.Column="1" Text="→" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-        <TextBox x:Name="TrimEnd" Grid.Column="2" Watermark="end, e.g. 01:15"/>
+        <TextBox x:Name="TrimEnd" Grid.Column="2" PlaceholderText="end, e.g. 01:15"/>
       </Grid>
 
       <TextBlock Text="SAVE TO" Margin="0,10,0,0" FontWeight="Bold"/>
@@ -41,7 +41,10 @@
         <Button Grid.Column="1" Content="Browse" Click="Browse_Click" HorizontalContentAlignment="Center"/>
       </Grid>
 
-      <Button x:Name="DownloadButton" Content="DOWNLOAD" Height="50" Margin="0,10,0,0" Background="#4C6FFF" Foreground="White" FontWeight="Bold" Click="Download_Click"/>
+      <Grid ColumnDefinitions="*,120" ColumnSpacing="8" Margin="0,10,0,0">
+        <Button x:Name="DownloadButton" Grid.Column="0" Content="DOWNLOAD" Height="50" Background="#4C6FFF" Foreground="White" FontWeight="Bold" Click="Download_Click"/>
+        <Button x:Name="CancelJobButton" Grid.Column="1" Content="Cancel" Height="50" IsEnabled="False" Click="CancelJob_Click"/>
+      </Grid>
       <ProgressBar x:Name="Progress" Minimum="0" Maximum="100" Height="12"/>
       <TextBlock x:Name="StatusText" Text="Ready" FontWeight="Bold" Foreground="#8ED7A7"/>
       <TextBlock x:Name="ProgressText" Text="Waiting for a download." FontSize="12" Opacity="0.72" TextWrapping="Wrap"/>
