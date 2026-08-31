@@ -89,22 +89,25 @@ jobs:
           dist/linux-x64/app/tools/ffmpeg -version | head -n 1
           dist/linux-x64/app/tools/ffprobe -version | head -n 1
 
-      - name: Add Linux launcher and README
+      - name: Add Linux launcher, desktop files and README
         run: |
-          cat > dist/linux-x64/app/sapgun-media-grabber <<'EOF'
-          #!/usr/bin/env bash
-          set -e
-          HERE="$(cd "$(dirname "$0")" && pwd)"
-          exec "$HERE/SAPGUN Media Grabber" "$@"
-          EOF
-          sed -i 's/^          //' dist/linux-x64/app/sapgun-media-grabber
-          chmod +x dist/linux-x64/app/sapgun-media-grabber
+          cp crossplatform/packaging/linux/sapgun-media-grabber dist/linux-x64/app/sapgun-media-grabber
+          cp crossplatform/packaging/linux/install-desktop.sh dist/linux-x64/app/install-desktop.sh
+          cp crossplatform/packaging/linux/sapgun-media-grabber.desktop dist/linux-x64/app/sapgun-media-grabber.desktop
+          cp crossplatform/packaging/linux/sapgun-media-grabber.svg dist/linux-x64/app/sapgun-media-grabber.svg
+          chmod +x dist/linux-x64/app/sapgun-media-grabber dist/linux-x64/app/install-desktop.sh
 
           cat > dist/linux-x64/app/README-LINUX.txt <<EOF
           SAPGUN Media Grabber v${APP_VERSION} — Linux x64
 
           Run:
             ./sapgun-media-grabber
+
+          Optional desktop launcher:
+            ./install-desktop.sh
+
+          This writes a .desktop file into ~/.local/share/applications that points
+          at this extracted folder. Re-run it if you move the folder.
 
           This build is self-contained and bundles yt-dlp, FFmpeg and ffprobe.
           No system Python, yt-dlp, FFmpeg or .NET installation is required.
@@ -121,6 +124,14 @@ jobs:
         run: |
           test -x 'dist/linux-x64/app/SAPGUN Media Grabber'
           test -x dist/linux-x64/app/sapgun-media-grabber
+          test -x dist/linux-x64/app/install-desktop.sh
+          test -f dist/linux-x64/app/sapgun-media-grabber.desktop
+          test -f dist/linux-x64/app/sapgun-media-grabber.svg
+          grep -q 'Exec="@EXEC@"' dist/linux-x64/app/sapgun-media-grabber.desktop
+          HOME=/tmp/sapgun-desktop-smoke \
+            dist/linux-x64/app/install-desktop.sh
+          grep -F "$(pwd)/dist/linux-x64/app/sapgun-media-grabber" \
+            /tmp/sapgun-desktop-smoke/.local/share/applications/sapgun-media-grabber.desktop
           test -x dist/linux-x64/app/tools/yt-dlp
           test -x dist/linux-x64/app/tools/ffmpeg
           test -x dist/linux-x64/app/tools/ffprobe

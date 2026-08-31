@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=SAPGUN Media Grabber
+Comment=Local yt-dlp + FFmpeg media grabber
+TryExec=@EXEC@
+Exec="@EXEC@"
+Path=@DIR@
+Icon=@ICON@
+Terminal=false
+Categories=AudioVideo;Video;
+StartupNotify=true
+StartupWMClass=SAPGUN Media Grabber

@@ -59,6 +59,8 @@ The Avalonia/.NET Linux x64 build now passes CI on Ubuntu, including:
 
 A public **v0.3.0-alpha.1** Linux x64 archive is on GitHub Releases (prerelease, not Latest). The in-app updater in this branch looks for `SAPGUN-Media-Grabber-vX.Y.Z-linux-x64.tar.gz` plus `SHA256SUMS-linux-x64.txt`.
 
+After extracting, run `./app/sapgun-media-grabber`. Optional: `./app/install-desktop.sh` writes a `.desktop` launcher into `~/.local/share/applications`.
+
 Stable users should keep using the Windows installer from **Latest Release**. Do not treat Linux alpha as production.
 
 ### macOS Apple Silicon — v0.3.0 alpha
