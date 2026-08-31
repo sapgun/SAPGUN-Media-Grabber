@@ -19,7 +19,12 @@ on:
         required: true
         type: string
       windows_run_id:
-        description: 'Optional successful run ID of "Windows x64 v0.3.0 Alpha". Leave empty to publish Linux+macOS only.'
+        description: 'Optional successful run ID of "Windows x64 v0.3.0 Alpha". Leave empty to skip the portable zip.'
+        required: false
+        type: string
+        default: ''
+      macos_intel_run_id:
+        description: 'Optional successful run ID of "macOS Intel v0.3.0 Alpha". Leave empty to skip the Intel tarball.'
         required: false
         type: string
         default: ''
@@ -68,6 +73,14 @@ jobs:
             -n SAPGUN-Media-Grabber-windows-x64-alpha \
             -D release
 
+      - name: Download validated macOS Intel CI artifacts
+        if: ${{ inputs.macos_intel_run_id != '' }}
+        run: |
+          gh run download "${{ inputs.macos_intel_run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            -n SAPGUN-Media-Grabber-macos-x64-alpha \
+            -D release
+
       - name: Verify expected alpha.2 filenames
         run: |
           ls -lah release
@@ -85,6 +98,12 @@ jobs:
             test -f release/SHA256SUMS-win-x64.txt
             echo '--- Windows checksum ---'
             cat release/SHA256SUMS-win-x64.txt
+          fi
+          if [ -n "${{ inputs.macos_intel_run_id }}" ]; then
+            test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-x64.tar.gz
+            test -f release/SHA256SUMS-macos-x64.txt
+            echo '--- macOS Intel checksum ---'
+            cat release/SHA256SUMS-macos-x64.txt
           fi
 
       - name: Write release notes
@@ -124,6 +143,11 @@ jobs:
 
           Unsigned / not notarized. Finder, Gatekeeper, and cookies still need real-user testing.
           This updater does **not** replace the `.app` automatically.
+
+          ## macOS Intel — Experimental / Beta (optional)
+
+          If this release includes `SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-x64.tar.gz`, it is an unsigned Intel `.app`.
+          Apple Silicon users should keep using the macos-arm64 archive.
 
           ## Important
 

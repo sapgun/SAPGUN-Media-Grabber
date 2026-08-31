@@ -21,6 +21,9 @@ public class CookieBrowsersTests
         var ids = CookieBrowsers.ForPlatform(PlatformDetector.OsxArm64).Select(b => b.Id).ToArray();
         Assert.Equal(new[] { "", "safari", "chrome", "firefox", "brave", "edge" }, ids);
         Assert.DoesNotContain("chromium", ids);
+        Assert.Equal(
+            CookieBrowsers.ForPlatform(PlatformDetector.OsxArm64).Select(b => b.Id),
+            CookieBrowsers.ForPlatform(PlatformDetector.OsxX64).Select(b => b.Id));
     }
 
     [Fact]
@@ -34,7 +37,7 @@ public class CookieBrowsersTests
     [Fact]
     public void YtDlpBrowserIdsAreLowercaseTokens()
     {
-        foreach (var platform in new[] { PlatformDetector.LinuxX64, PlatformDetector.OsxArm64, PlatformDetector.WinX64 })
+        foreach (var platform in new[] { PlatformDetector.LinuxX64, PlatformDetector.OsxArm64, PlatformDetector.OsxX64, PlatformDetector.WinX64 })
         {
             foreach (var browser in CookieBrowsers.ForPlatform(platform).Where(b => b.Id != ""))
             {

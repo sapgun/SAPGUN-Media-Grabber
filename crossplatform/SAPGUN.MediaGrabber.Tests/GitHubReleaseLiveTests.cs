@@ -26,6 +26,7 @@ public class GitHubReleaseLiveTests
         Assert.NotNull(macos);
         Assert.Equal("SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz", macos!.Package.Name);
 
+        Assert.Null(UpdateAssetSelector.Select(alpha, PlatformDetector.OsxX64));
         var windowsOnAlpha = UpdateAssetSelector.Select(alpha, PlatformDetector.WinX64);
         Assert.Null(windowsOnAlpha);
 

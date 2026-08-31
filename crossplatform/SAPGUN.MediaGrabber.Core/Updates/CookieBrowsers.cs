@@ -8,7 +8,7 @@ public static class CookieBrowsers
 
     public static IReadOnlyList<CookieBrowser> ForCurrentOs()
     {
-        if (OperatingSystem.IsMacOS()) return ForPlatform(PlatformDetector.OsxArm64);
+        if (OperatingSystem.IsMacOS()) return ForPlatform(PlatformDetector.Detect());
         if (OperatingSystem.IsWindows()) return ForPlatform(PlatformDetector.WinX64);
         return ForPlatform(PlatformDetector.LinuxX64);
     }

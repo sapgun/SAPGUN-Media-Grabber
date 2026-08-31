@@ -1,0 +1,205 @@
+name: macOS Intel v0.3.0 Alpha
+
+on:
+  push:
+    branches:
+      - feature/cross-platform-v0.3.0
+    paths:
+      - 'crossplatform/**'
+      - '.github/workflows/macos-intel-v0.3.0-alpha.yml'
+  pull_request:
+    paths:
+      - 'crossplatform/**'
+      - '.github/workflows/macos-intel-v0.3.0-alpha.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-x64:
+    runs-on: macos-13
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Intel runner
+        run: |
+          uname -a
+          test "$(uname -m)" = "x86_64"
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: |
+          dotnet restore crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj
+          dotnet restore crossplatform/SAPGUN.MediaGrabber.Tests/SAPGUN.MediaGrabber.Tests.csproj
+
+      - name: Build
+        run: dotnet build crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -c Release --no-restore
+
+      - name: Test app-update logic
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: dotnet test crossplatform/SAPGUN.MediaGrabber.Tests/SAPGUN.MediaGrabber.Tests.csproj -c Release --no-restore
+
+      - name: Resolve app version
+        run: |
+          APP_VERSION=$(dotnet msbuild crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -getProperty:Version -nologo | tr -d '[:space:]')
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "Resolved APP_VERSION=$APP_VERSION"
+
+      - name: Create app bundle and publish self-contained osx-x64 app
+        run: |
+          APP='dist/macos-x64/SAPGUN Media Grabber.app'
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          dotnet publish crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj \
+            -c Release \
+            -r osx-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -p:PublishTrimmed=false \
+            -o "$APP/Contents/MacOS"
+
+          cat > "$APP/Contents/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key>
+            <string>SAPGUN Media Grabber</string>
+            <key>CFBundleDisplayName</key>
+            <string>SAPGUN Media Grabber</string>
+            <key>CFBundleIdentifier</key>
+            <string>io.github.sapgun.sapgun-media-grabber</string>
+            <key>CFBundleExecutable</key>
+            <string>SAPGUN Media Grabber</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>0.3.0</string>
+            <key>CFBundleVersion</key>
+            <string>${APP_VERSION}</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>13.0</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+          sed -i '' 's/^          //' "$APP/Contents/Info.plist"
+
+      - name: Bundle latest yt-dlp for macOS
+        run: |
+          TOOLS='dist/macos-x64/SAPGUN Media Grabber.app/Contents/MacOS/tools'
+          mkdir -p "$TOOLS"
+          curl -fL --retry 3 \
+            https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos \
+            -o "$TOOLS/yt-dlp"
+          chmod +x "$TOOLS/yt-dlp"
+          "$TOOLS/yt-dlp" --version
+
+      - name: Bundle pinned x264-enabled FFmpeg and ffprobe for Intel
+        run: |
+          TOOLS='dist/macos-x64/SAPGUN Media Grabber.app/Contents/MacOS/tools'
+          RES='dist/macos-x64/SAPGUN Media Grabber.app/Contents/Resources'
+          BASE='https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1'
+
+          curl -fL --retry 3 "$BASE/ffmpeg-darwin-x64" -o "$TOOLS/ffmpeg"
+          curl -fL --retry 3 "$BASE/ffprobe-darwin-x64" -o "$TOOLS/ffprobe"
+          curl -fL --retry 3 "$BASE/darwin-x64.LICENSE" -o "$RES/FFmpeg-LICENSE.txt"
+          curl -fL --retry 3 "$BASE/darwin-x64.README" -o "$RES/FFmpeg-BUILD-INFO.txt"
+
+          echo 'ebdddc936f61e14049a2d4b549a412b8a40deeff6540e58a9f2a2da9e6b18894  dist/macos-x64/SAPGUN Media Grabber.app/Contents/MacOS/tools/ffmpeg' | shasum -a 256 -c -
+          echo 'fa3add0ce901f7241abe0dfc0155d958fc834aca3f8ce61f87cc712ae669c1e0  dist/macos-x64/SAPGUN Media Grabber.app/Contents/MacOS/tools/ffprobe' | shasum -a 256 -c -
+
+          chmod +x "$TOOLS/ffmpeg" "$TOOLS/ffprobe"
+          xattr -d com.apple.quarantine "$TOOLS/ffmpeg" "$TOOLS/ffprobe" "$TOOLS/yt-dlp" 2>/dev/null || true
+          "$TOOLS/ffmpeg" -version | head -n 1
+          "$TOOLS/ffprobe" -version | head -n 1
+
+      - name: Verify x86_64 binaries and required codec support
+        run: |
+          APP='dist/macos-x64/SAPGUN Media Grabber.app'
+          TOOLS="$APP/Contents/MacOS/tools"
+          test -x "$APP/Contents/MacOS/SAPGUN Media Grabber"
+          test -x "$TOOLS/yt-dlp"
+          test -x "$TOOLS/ffmpeg"
+          test -x "$TOOLS/ffprobe"
+          file "$APP/Contents/MacOS/SAPGUN Media Grabber"
+          file "$TOOLS/yt-dlp"
+          file "$TOOLS/ffmpeg"
+          "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -q libx264
+          "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
+
+      - name: X-ready MP4 codec smoke test
+        run: |
+          TOOLS='dist/macos-x64/SAPGUN Media Grabber.app/Contents/MacOS/tools'
+          "$TOOLS/ffmpeg" -y -hide_banner -loglevel error \
+            -f lavfi -i 'testsrc=size=1280x720:rate=30' \
+            -f lavfi -i 'sine=frequency=1000:sample_rate=48000' \
+            -t 3 -c:v libx264 -pix_fmt yuv420p -c:a aac /tmp/source.mp4
+
+          "$TOOLS/ffmpeg" -y -hide_banner -loglevel error -i /tmp/source.mp4 \
+            -map 0:v:0 -map '0:a:0?' \
+            -c:v libx264 -preset medium -profile:v high -level 4.1 \
+            -pix_fmt yuv420p -vf "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease" \
+            -fpsmax 30 -crf 20 -maxrate 8M -bufsize 16M \
+            -c:a aac -b:a 192k -ar 48000 -ac 2 -movflags +faststart \
+            /tmp/x-ready.mp4
+
+          VCODEC=$("$TOOLS/ffprobe" -v error -select_streams v:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          PIXFMT=$("$TOOLS/ffprobe" -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          ACODEC=$("$TOOLS/ffprobe" -v error -select_streams a:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          echo "video=$VCODEC pix_fmt=$PIXFMT audio=$ACODEC"
+          test "$VCODEC" = "h264"
+          test "$PIXFMT" = "yuv420p"
+          test "$ACODEC" = "aac"
+
+      - name: GUI launch smoke test on macOS Intel
+        run: |
+          APP='dist/macos-x64/SAPGUN Media Grabber.app'
+          BIN="$APP/Contents/MacOS/SAPGUN Media Grabber"
+          set +e
+          "$BIN" >/tmp/sapgun-grabber-macos-intel.log 2>&1 &
+          PID=$!
+          sleep 8
+          if kill -0 "$PID" 2>/dev/null; then
+            echo "GUI process stayed alive on Intel macOS."
+            kill "$PID" 2>/dev/null || true
+            wait "$PID" 2>/dev/null || true
+            CODE=0
+          else
+            wait "$PID"
+            CODE=$?
+            echo "GUI exited early with code $CODE"
+            cat /tmp/sapgun-grabber-macos-intel.log
+          fi
+          set -e
+          test "$CODE" -eq 0
+
+      - name: Package macOS Intel alpha
+        run: |
+          cp crossplatform/packaging/macos/README-MACOS-INTEL.txt dist/macos-x64/README-MACOS.txt
+          cp crossplatform/packaging/macos/remove-quarantine.sh dist/macos-x64/remove-quarantine.sh
+          chmod +x dist/macos-x64/remove-quarantine.sh
+          test -f dist/macos-x64/README-MACOS.txt
+          test -x dist/macos-x64/remove-quarantine.sh
+          cd dist/macos-x64
+          tar -czf ../SAPGUN-Media-Grabber-v${APP_VERSION}-macos-x64.tar.gz \
+            'SAPGUN Media Grabber.app' README-MACOS.txt remove-quarantine.sh
+          cd ..
+          shasum -a 256 SAPGUN-Media-Grabber-v${APP_VERSION}-macos-x64.tar.gz | tee SHA256SUMS-macos-x64.txt
+
+      - name: Upload macOS Intel alpha artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SAPGUN-Media-Grabber-macos-x64-alpha
+          path: |
+            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-macos-x64.tar.gz
+            dist/SHA256SUMS-macos-x64.txt
+          if-no-files-found: error

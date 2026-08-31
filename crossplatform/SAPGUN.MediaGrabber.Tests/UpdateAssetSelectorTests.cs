@@ -48,6 +48,19 @@ public class UpdateAssetSelectorTests
     }
 
     [Fact]
+    public void SelectsMacosIntelTarball()
+    {
+        var selected = UpdateAssetSelector.Select(Release(
+            Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-x64.tar.gz"),
+            Asset("SHA256SUMS-macos-x64.txt")),
+            PlatformDetector.OsxX64);
+        Assert.NotNull(selected);
+        Assert.Equal("SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-x64.tar.gz", selected!.Package.Name);
+        Assert.Equal("SHA256SUMS-macos-x64.txt", selected.ChecksumFile?.Name);
+        Assert.Equal(UpdateApplyAction.RevealDownload, selected.ApplyAction);
+    }
+
+    [Fact]
     public void SelectsWindowsInstallerWhenNoPortableZip()
     {
         var selected = UpdateAssetSelector.Select(Release(
@@ -107,8 +120,8 @@ public class UpdateAssetSelectorTests
     [Fact]
     public void RejectsUnsupportedPlatform()
     {
-        Assert.Null(UpdateAssetSelector.Select(Release(Asset("SAPGUN-Media-Grabber-Setup.exe")), "osx-x64"));
         Assert.Null(UpdateAssetSelector.Select(Release(Asset("SAPGUN-Media-Grabber-Setup.exe")), "linux-arm64"));
+        Assert.Null(UpdateAssetSelector.Select(Release(Asset("SAPGUN-Media-Grabber-Setup.exe")), "win-arm64"));
     }
 }
 
