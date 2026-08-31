@@ -7,7 +7,9 @@
     <ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('Windows'))"></ApplicationIcon>
     <AssemblyName>SAPGUN Media Grabber</AssemblyName>
     <RootNamespace>SapgunMediaGrabber</RootNamespace>
-    <Version>0.3.0-alpha.1</Version>
+    <Version>0.3.0</Version>
+    <InformationalVersion>0.3.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <AvaloniaNameGeneratorFilterByPath>__manual-control-lookup__</AvaloniaNameGeneratorFilterByPath>
   </PropertyGroup>
@@ -16,5 +18,8 @@
     <PackageReference Include="Avalonia" Version="12.1.1" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SAPGUN.MediaGrabber.Core\SAPGUN.MediaGrabber.Core.csproj" />
   </ItemGroup>
 </Project>

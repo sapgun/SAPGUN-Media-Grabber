@@ -1,0 +1,20 @@
+SAPGUN Media Grabber ships the following third-party tools. They keep
+their own licenses. This app is a local GUI over them, not a cloud
+converter.
+
+yt-dlp
+  Source: https://github.com/yt-dlp/yt-dlp
+  License file in this package: yt-dlp-LICENSE.txt
+  Typical terms: Unlicense / public domain (see that file).
+
+FFmpeg and ffprobe
+  Linux / Windows builds: https://github.com/BtbN/FFmpeg-Builds (GPL)
+  macOS builds: https://github.com/eugeneware/ffmpeg-static (see bundled
+  FFmpeg-LICENSE.txt and FFmpeg-BUILD-INFO.txt)
+  License file in this package: FFmpeg-LICENSE.txt
+  These binaries include GPL-licensed encoders such as libx264.
+
+Do not redistribute this package without those license files.
+
+This application itself is MIT. See LICENSE.txt in the package
+(or LICENSE in the source repository).

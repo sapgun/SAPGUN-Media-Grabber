@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="SAPGUN Media Grabber">
+  <rect width="128" height="128" rx="28" fill="#4C6FFF"/>
+  <rect x="28" y="34" width="72" height="48" rx="8" fill="#0E1015"/>
+  <rect x="34" y="40" width="60" height="36" rx="4" fill="#1E2230"/>
+  <polygon points="54,50 54,66 70,58" fill="#8ED7A7"/>
+  <rect x="40" y="90" width="48" height="8" rx="4" fill="#0E1015"/>
+</svg>

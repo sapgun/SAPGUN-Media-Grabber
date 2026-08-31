@@ -1,4 +1,4 @@
-name: Linux x64 v0.3.0 Alpha
+name: Linux arm64 v0.3.0 Alpha
 
 on:
   push:
@@ -6,23 +6,28 @@ on:
       - feature/cross-platform-v0.3.0
     paths:
       - 'crossplatform/**'
-      - '.github/workflows/linux-v0.3.0-alpha.yml'
+      - '.github/workflows/linux-arm64-v0.3.0-alpha.yml'
   pull_request:
     paths:
       - 'crossplatform/**'
-      - '.github/workflows/linux-v0.3.0-alpha.yml'
+      - '.github/workflows/linux-arm64-v0.3.0-alpha.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-linux-x64:
-    runs-on: ubuntu-latest
+  build-linux-arm64:
+    runs-on: ubuntu-24.04-arm
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify arm64 runner
+        run: |
+          uname -a
+          test "$(uname -m)" = "aarch64"
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
@@ -53,29 +58,29 @@ jobs:
           echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
           echo "Resolved APP_VERSION=$APP_VERSION"
 
-      - name: Publish self-contained linux-x64 app
+      - name: Publish self-contained linux-arm64 app
         run: |
           dotnet publish crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj \
             -c Release \
-            -r linux-x64 \
+            -r linux-arm64 \
             --self-contained true \
             -p:PublishSingleFile=false \
             -p:PublishTrimmed=false \
-            -o dist/linux-x64/app
+            -o dist/linux-arm64/app
 
-      - name: Bundle latest yt-dlp for Linux
+      - name: Bundle latest yt-dlp for Linux arm64
         run: |
-          mkdir -p dist/linux-x64/app/tools
+          mkdir -p dist/linux-arm64/app/tools
           curl -fL --retry 3 \
-            https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
-            -o dist/linux-x64/app/tools/yt-dlp
-          chmod +x dist/linux-x64/app/tools/yt-dlp
-          dist/linux-x64/app/tools/yt-dlp --version
+            https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64 \
+            -o dist/linux-arm64/app/tools/yt-dlp
+          chmod +x dist/linux-arm64/app/tools/yt-dlp
+          dist/linux-arm64/app/tools/yt-dlp --version
 
-      - name: Bundle static FFmpeg + ffprobe for Linux
+      - name: Bundle static FFmpeg + ffprobe for Linux arm64
         run: |
           curl -fL --retry 3 \
-            https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz \
+            https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz \
             -o /tmp/ffmpeg.tar.xz
           mkdir -p /tmp/ffmpeg-bundle
           tar -xJf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-bundle
@@ -83,29 +88,29 @@ jobs:
           FFPROBE=$(find /tmp/ffmpeg-bundle -type f -path '*/bin/ffprobe' | head -n 1)
           test -n "$FFMPEG"
           test -n "$FFPROBE"
-          cp "$FFMPEG" dist/linux-x64/app/tools/ffmpeg
-          cp "$FFPROBE" dist/linux-x64/app/tools/ffprobe
-          chmod +x dist/linux-x64/app/tools/ffmpeg dist/linux-x64/app/tools/ffprobe
+          cp "$FFMPEG" dist/linux-arm64/app/tools/ffmpeg
+          cp "$FFPROBE" dist/linux-arm64/app/tools/ffprobe
+          chmod +x dist/linux-arm64/app/tools/ffmpeg dist/linux-arm64/app/tools/ffprobe
           FFLIC=$(find /tmp/ffmpeg-bundle -type f \( -iname 'LICENSE*' -o -iname 'COPYING*' \) | head -n 1)
           test -n "$FFLIC"
-          cp "$FFLIC" dist/linux-x64/app/FFmpeg-LICENSE.txt
+          cp "$FFLIC" dist/linux-arm64/app/FFmpeg-LICENSE.txt
           curl -fL --retry 3 https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/LICENSE \
-            -o dist/linux-x64/app/yt-dlp-LICENSE.txt
-          cp crossplatform/packaging/THIRD_PARTY_NOTICES.txt dist/linux-x64/app/THIRD_PARTY_NOTICES.txt
-          cp LICENSE dist/linux-x64/app/LICENSE.txt
-          dist/linux-x64/app/tools/ffmpeg -version | head -n 1
-          dist/linux-x64/app/tools/ffprobe -version | head -n 1
+            -o dist/linux-arm64/app/yt-dlp-LICENSE.txt
+          cp crossplatform/packaging/THIRD_PARTY_NOTICES.txt dist/linux-arm64/app/THIRD_PARTY_NOTICES.txt
+          cp LICENSE dist/linux-arm64/app/LICENSE.txt
+          dist/linux-arm64/app/tools/ffmpeg -version | head -n 1
+          dist/linux-arm64/app/tools/ffprobe -version | head -n 1
 
       - name: Add Linux launcher, desktop files and README
         run: |
-          cp crossplatform/packaging/linux/sapgun-media-grabber dist/linux-x64/app/sapgun-media-grabber
-          cp crossplatform/packaging/linux/install-desktop.sh dist/linux-x64/app/install-desktop.sh
-          cp crossplatform/packaging/linux/sapgun-media-grabber.desktop dist/linux-x64/app/sapgun-media-grabber.desktop
-          cp crossplatform/packaging/linux/sapgun-media-grabber.svg dist/linux-x64/app/sapgun-media-grabber.svg
-          chmod +x dist/linux-x64/app/sapgun-media-grabber dist/linux-x64/app/install-desktop.sh
+          cp crossplatform/packaging/linux/sapgun-media-grabber dist/linux-arm64/app/sapgun-media-grabber
+          cp crossplatform/packaging/linux/install-desktop.sh dist/linux-arm64/app/install-desktop.sh
+          cp crossplatform/packaging/linux/sapgun-media-grabber.desktop dist/linux-arm64/app/sapgun-media-grabber.desktop
+          cp crossplatform/packaging/linux/sapgun-media-grabber.svg dist/linux-arm64/app/sapgun-media-grabber.svg
+          chmod +x dist/linux-arm64/app/sapgun-media-grabber dist/linux-arm64/app/install-desktop.sh
 
-          cat > dist/linux-x64/app/README-LINUX.txt <<EOF
-          SAPGUN Media Grabber v${APP_VERSION} — Linux x64
+          cat > dist/linux-arm64/app/README-LINUX.txt <<EOF
+          SAPGUN Media Grabber v${APP_VERSION} — Linux arm64
 
           Run:
             ./sapgun-media-grabber
@@ -119,7 +124,7 @@ jobs:
           This build is self-contained and bundles yt-dlp, FFmpeg and ffprobe.
           No system Python, yt-dlp, FFmpeg or .NET installation is required.
 
-          An AppImage is also produced: SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.AppImage
+          An AppImage is also produced: SAPGUN-Media-Grabber-v${APP_VERSION}-linux-arm64.AppImage
 
           Licenses: LICENSE.txt, THIRD_PARTY_NOTICES.txt, FFmpeg-LICENSE.txt, yt-dlp-LICENSE.txt
 
@@ -129,33 +134,31 @@ jobs:
           Support:  https://ko-fi.com/sapgun
           Source:   https://github.com/sapgun/SAPGUN-Media-Grabber
           EOF
-          sed -i 's/^          //' dist/linux-x64/app/README-LINUX.txt
+          sed -i 's/^          //' dist/linux-arm64/app/README-LINUX.txt
 
       - name: Verify bundled files
         run: |
-          test -x 'dist/linux-x64/app/SAPGUN Media Grabber'
-          test -x dist/linux-x64/app/sapgun-media-grabber
-          test -x dist/linux-x64/app/install-desktop.sh
-          test -f dist/linux-x64/app/sapgun-media-grabber.desktop
-          test -f dist/linux-x64/app/sapgun-media-grabber.svg
-          grep -q 'Exec="@EXEC@"' dist/linux-x64/app/sapgun-media-grabber.desktop
+          test -x 'dist/linux-arm64/app/SAPGUN Media Grabber'
+          test -x dist/linux-arm64/app/sapgun-media-grabber
+          test -x dist/linux-arm64/app/install-desktop.sh
           HOME=/tmp/sapgun-desktop-smoke \
-            dist/linux-x64/app/install-desktop.sh
-          grep -F "$(pwd)/dist/linux-x64/app/sapgun-media-grabber" \
+            dist/linux-arm64/app/install-desktop.sh
+          grep -F "$(pwd)/dist/linux-arm64/app/sapgun-media-grabber" \
             /tmp/sapgun-desktop-smoke/.local/share/applications/sapgun-media-grabber.desktop
-          dist/linux-x64/app/tools/ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx264
-          dist/linux-x64/app/tools/ffmpeg -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
-          test -x dist/linux-x64/app/tools/yt-dlp
-          test -x dist/linux-x64/app/tools/ffmpeg
-          test -x dist/linux-x64/app/tools/ffprobe
-          test -s dist/linux-x64/app/FFmpeg-LICENSE.txt
-          test -s dist/linux-x64/app/yt-dlp-LICENSE.txt
-          test -s dist/linux-x64/app/THIRD_PARTY_NOTICES.txt
-          test -s dist/linux-x64/app/LICENSE.txt
+          dist/linux-arm64/app/tools/ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx264
+          dist/linux-arm64/app/tools/ffmpeg -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
+          file dist/linux-arm64/app/tools/ffmpeg | grep -Ei 'ARM|aarch64'
+          test -x dist/linux-arm64/app/tools/yt-dlp
+          test -x dist/linux-arm64/app/tools/ffmpeg
+          test -x dist/linux-arm64/app/tools/ffprobe
+          test -s dist/linux-arm64/app/FFmpeg-LICENSE.txt
+          test -s dist/linux-arm64/app/yt-dlp-LICENSE.txt
+          test -s dist/linux-arm64/app/THIRD_PARTY_NOTICES.txt
+          test -s dist/linux-arm64/app/LICENSE.txt
 
       - name: X-ready MP4 codec smoke test
         run: |
-          TOOLS=dist/linux-x64/app/tools
+          TOOLS=dist/linux-arm64/app/tools
           "$TOOLS/ffmpeg" -y -hide_banner -loglevel error \
             -f lavfi -i 'testsrc=size=1280x720:rate=30' \
             -f lavfi -i 'sine=frequency=1000:sample_rate=48000' \
@@ -180,7 +183,7 @@ jobs:
       - name: GUI launch smoke test under Xvfb
         run: |
           set +e
-          xvfb-run -a timeout 8s dist/linux-x64/app/sapgun-media-grabber
+          xvfb-run -a timeout 8s dist/linux-arm64/app/sapgun-media-grabber
           CODE=$?
           set -e
           if [ "$CODE" -ne 0 ] && [ "$CODE" -ne 124 ]; then
@@ -189,27 +192,27 @@ jobs:
           fi
           echo "GUI process launched successfully under Xvfb."
 
-      - name: Package Linux x64 tarball
+      - name: Package Linux arm64 tarball
         run: |
-          tar -C dist/linux-x64 -czf dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.tar.gz app
-          sha256sum dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.tar.gz | tee dist/SHA256SUMS-linux-x64.txt
+          tar -C dist/linux-arm64 -czf dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-arm64.tar.gz app
+          sha256sum dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-arm64.tar.gz | tee dist/SHA256SUMS-linux-arm64.txt
 
-      - name: Build Linux x64 AppImage
+      - name: Build Linux arm64 AppImage
         run: |
           chmod +x crossplatform/packaging/linux/build-appimage.sh
           crossplatform/packaging/linux/build-appimage.sh \
-            dist/linux-x64/app \
-            dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.AppImage \
-            x86_64
-          sha256sum dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.AppImage | tee dist/SHA256SUMS-linux-x64-appimage.txt
+            dist/linux-arm64/app \
+            dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-arm64.AppImage \
+            aarch64
+          sha256sum dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-arm64.AppImage | tee dist/SHA256SUMS-linux-arm64-appimage.txt
 
-      - name: Upload Linux alpha artifact
+      - name: Upload Linux arm64 alpha artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SAPGUN-Media-Grabber-linux-x64-alpha
+          name: SAPGUN-Media-Grabber-linux-arm64-alpha
           path: |
-            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-linux-x64.tar.gz
-            dist/SHA256SUMS-linux-x64.txt
-            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-linux-x64.AppImage
-            dist/SHA256SUMS-linux-x64-appimage.txt
+            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-linux-arm64.tar.gz
+            dist/SHA256SUMS-linux-arm64.txt
+            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-linux-arm64.AppImage
+            dist/SHA256SUMS-linux-arm64-appimage.txt
           if-no-files-found: error

@@ -1,39 +1,54 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Headers;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using SapgunMediaGrabber.Updates;
 
 namespace SapgunMediaGrabber;
 
 public partial class MainWindow : Window
 {
-    const string AppVersion = "0.3.0-alpha.1";
     const string XProfileUrl = "https://x.com/caro7370";
     const string KoFiUrl = "https://ko-fi.com/sapgun";
 
     readonly string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SAPGUN Media Grabber");
     readonly string toolsDir;
     readonly string settingsFile;
+    readonly string channelFile;
+    readonly string folderFile;
+    readonly string cookieFile;
+    readonly string engineAutoFile;
+    readonly HttpClient http = CreateHttp();
+    readonly AppUpdateService appUpdates;
+
+    UpdateCheckResult? lastAppCheck;
+    CancellationTokenSource? appDownloadCts;
+    CancellationTokenSource? jobCts;
 
     TextBox UrlBox => this.FindControl<TextBox>("UrlBox")!;
     TextBox FolderBox => this.FindControl<TextBox>("FolderBox")!;
     TextBox TrimStart => this.FindControl<TextBox>("TrimStart")!;
     TextBox TrimEnd => this.FindControl<TextBox>("TrimEnd")!;
-    CheckBox TrimCheck => this.FindControl<CheckBox>("TrimCheck")!;
+    RadioButton Mp3Profile => this.FindControl<RadioButton>("Mp3Profile")!;
+    ToggleSwitch TrimCheck => this.FindControl<ToggleSwitch>("TrimCheck")!;
     RadioButton XProfile => this.FindControl<RadioButton>("XProfile")!;
     RadioButton OriginalProfile => this.FindControl<RadioButton>("OriginalProfile")!;
     RadioButton Mp4Profile => this.FindControl<RadioButton>("Mp4Profile")!;
     ComboBox CookieBox => this.FindControl<ComboBox>("CookieBox")!;
+    TextBlock CookieHint => this.FindControl<TextBlock>("CookieHint")!;
+    TextBlock PlatformBanner => this.FindControl<TextBlock>("PlatformBanner")!;
     Button DownloadButton => this.FindControl<Button>("DownloadButton")!;
+    Button CancelJobButton => this.FindControl<Button>("CancelJobButton")!;
     Button OpenFolderButton => this.FindControl<Button>("OpenFolderButton")!;
     Button ThemeButton => this.FindControl<Button>("ThemeButton")!;
     ProgressBar Progress => this.FindControl<ProgressBar>("Progress")!;
@@ -41,6 +56,25 @@ public partial class MainWindow : Window
     TextBlock ProgressText => this.FindControl<TextBlock>("ProgressText")!;
     TextBlock InstalledYtDlp => this.FindControl<TextBlock>("InstalledYtDlp")!;
     TextBlock LatestYtDlp => this.FindControl<TextBlock>("LatestYtDlp")!;
+    TextBlock AppCurrentVersion => this.FindControl<TextBlock>("AppCurrentVersion")!;
+    TextBlock AppLatestVersion => this.FindControl<TextBlock>("AppLatestVersion")!;
+    TextBlock AppUpdateStatus => this.FindControl<TextBlock>("AppUpdateStatus")!;
+    ComboBox UpdateChannelBox => this.FindControl<ComboBox>("UpdateChannelBox")!;
+    Button CheckAppUpdateButton => this.FindControl<Button>("CheckAppUpdateButton")!;
+    Button DownloadAppUpdateButton => this.FindControl<Button>("DownloadAppUpdateButton")!;
+    Button CancelAppUpdateButton => this.FindControl<Button>("CancelAppUpdateButton")!;
+    ProgressBar AppUpdateProgress => this.FindControl<ProgressBar>("AppUpdateProgress")!;
+    TextBlock YtDlpBadgeText => this.FindControl<TextBlock>("YtDlpBadgeText")!;
+    TextBlock FfmpegBadgeText => this.FindControl<TextBlock>("FfmpegBadgeText")!;
+    Border YtDlpBadge => this.FindControl<Border>("YtDlpBadge")!;
+    Border FfmpegBadge => this.FindControl<Border>("FfmpegBadge")!;
+    Border OriginalCard => this.FindControl<Border>("OriginalCard")!;
+    Border XCard => this.FindControl<Border>("XCard")!;
+    Border Mp4Card => this.FindControl<Border>("Mp4Card")!;
+    Border Mp3Card => this.FindControl<Border>("Mp3Card")!;
+    Border AppCard => this.FindControl<Border>("AppCard")!;
+    Border EngineCard => this.FindControl<Border>("EngineCard")!;
+    CheckBox AutoUpdateYtDlpCheck => this.FindControl<CheckBox>("AutoUpdateYtDlpCheck")!;
 
     string lastOutput = "";
     bool lightMode;
@@ -50,15 +84,47 @@ public partial class MainWindow : Window
         AvaloniaXamlLoader.Load(this);
         toolsDir = Path.Combine(dataDir, "tools");
         settingsFile = Path.Combine(dataDir, "theme.txt");
+        channelFile = Path.Combine(dataDir, "update-channel.txt");
+        appUpdates = new AppUpdateService(http);
+        folderFile = Path.Combine(dataDir, "folder.txt");
+        cookieFile = Path.Combine(dataDir, "cookies.txt");
+        engineAutoFile = Path.Combine(dataDir, "engine-auto.txt");
         Directory.CreateDirectory(toolsDir);
         SeedBundledTools();
 
-        var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-        FolderBox.Text = Directory.Exists(downloads) ? downloads : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        FolderBox.Text = LoadFolder();
 
         lightMode = LoadTheme();
         ApplyTheme();
-        Opened += async (_, _) => await RefreshYtDlpVersions(false);
+        Title = "SAPGUN Media Grabber v" + AppVersionInfo.Current;
+        PlatformBanner.Text = "LOCAL  •  yt-dlp + FFmpeg  •  " + PlatformDetector.DisplayName(PlatformDetector.Detect()) + "  •  v" + AppVersionInfo.Current;
+        FillCookieBrowsers();
+        AutoUpdateYtDlpCheck.IsChecked = LoadEngineAutoUpdate();
+        AutoUpdateYtDlpCheck.IsCheckedChanged += (_, _) => SaveEngineAutoUpdate();
+        AppCurrentVersion.Text = "Current: v" + AppVersionInfo.Current;
+        UpdateChannelBox.SelectedIndex = LoadChannel() == UpdateChannel.Stable ? 1 : 0;
+        UpdateChannelBox.SelectionChanged += (_, _) => SaveChannel();
+        DownloadAppUpdateButton.Content = "Download Update";
+        TrimCheck.IsCheckedChanged += (_, _) => ApplyTrimEnabled();
+        ApplyTrimEnabled();
+        RefreshToolBadges();
+        RefreshProfileCards();
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, UrlDragOver);
+        AddHandler(DragDrop.DropEvent, UrlDrop);
+        Opened += async (_, _) =>
+        {
+            await RefreshYtDlpVersions(false);
+            if (AutoUpdateYtDlpCheck.IsChecked == true)
+                await UpdateYtDlpAsync(quiet: true);
+        };
+    }
+
+    static HttpClient CreateHttp()
+    {
+        var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SAPGUN-Media-Grabber", AppVersionInfo.Current));
+        return client;
     }
 
     string ToolName(string baseName) => OperatingSystem.IsWindows() ? baseName + ".exe" : baseName;
@@ -66,31 +132,8 @@ public partial class MainWindow : Window
     string Ffmpeg => Path.Combine(toolsDir, ToolName("ffmpeg"));
     string Ffprobe => Path.Combine(toolsDir, ToolName("ffprobe"));
 
-    void SeedBundledTools()
-    {
-        var seed = Path.Combine(AppContext.BaseDirectory, "tools");
-        if (!Directory.Exists(seed)) return;
-        foreach (var name in new[] { ToolName("yt-dlp"), ToolName("ffmpeg"), ToolName("ffprobe") })
-        {
-            var source = Path.Combine(seed, name);
-            var target = Path.Combine(toolsDir, name);
-            if (File.Exists(source) && !File.Exists(target)) File.Copy(source, target);
-            EnsureExecutable(target);
-        }
-    }
-
-    static void EnsureExecutable(string path)
-    {
-        if (OperatingSystem.IsWindows() || !File.Exists(path)) return;
-        try
-        {
-            File.SetUnixFileMode(path,
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-        }
-        catch { }
-    }
+    void SeedBundledTools() =>
+        BundledToolSeeder.Seed(Path.Combine(AppContext.BaseDirectory, "tools"), toolsDir);
 
     async void Paste_Click(object? sender, RoutedEventArgs e)
     {
@@ -101,25 +144,236 @@ public partial class MainWindow : Window
     async void Browse_Click(object? sender, RoutedEventArgs e)
     {
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Choose download folder", AllowMultiple = false });
-        if (folders.Count > 0) FolderBox.Text = folders[0].Path.LocalPath;
+        if (folders.Count > 0)
+        {
+            FolderBox.Text = folders[0].Path.LocalPath;
+            SaveFolder();
+        }
     }
 
+    void OriginalCard_Pressed(object? sender, PointerPressedEventArgs e) => OriginalProfile.IsChecked = true;
+    void XCard_Pressed(object? sender, PointerPressedEventArgs e) => XProfile.IsChecked = true;
+    void Mp4Card_Pressed(object? sender, PointerPressedEventArgs e) => Mp4Profile.IsChecked = true;
+    void Mp3Card_Pressed(object? sender, PointerPressedEventArgs e) => Mp3Profile.IsChecked = true;
+    void Profile_Changed(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => RefreshProfileCards();
+
+    void ApplyTrimEnabled()
+    {
+        var on = TrimCheck.IsChecked == true;
+        TrimStart.IsEnabled = on;
+        TrimEnd.IsEnabled = on;
+    }
+
+    void RefreshToolBadges()
+    {
+        StyleBadge(YtDlpBadge, YtDlpBadgeText, "yt-dlp", File.Exists(YtDlp));
+        StyleBadge(FfmpegBadge, FfmpegBadgeText, "FFmpeg", File.Exists(Ffmpeg));
+    }
+
+    void StyleBadge(Border badge, TextBlock label, string name, bool ok)
+    {
+        label.Text = ok ? name + "  ✓" : name + "  missing";
+        badge.Background = new SolidColorBrush(ok ? Color.Parse("#163528") : Color.Parse("#3A1C1C"));
+        label.Foreground = new SolidColorBrush(ok ? Color.Parse("#8ED7A7") : Color.Parse("#F0A0A0"));
+    }
+
+    void RefreshProfileCards()
+    {
+        StyleProfileCard(OriginalCard, OriginalProfile.IsChecked == true);
+        StyleProfileCard(XCard, XProfile.IsChecked == true);
+        StyleProfileCard(Mp4Card, Mp4Profile.IsChecked == true);
+        StyleProfileCard(Mp3Card, Mp3Profile.IsChecked == true);
+    }
+
+    void StyleProfileCard(Border card, bool selected)
+    {
+        card.BorderThickness = new Thickness(selected ? 2 : 1);
+        if (lightMode)
+        {
+            card.Background = new SolidColorBrush(selected ? Color.Parse("#EAF0FF") : Color.Parse("#FFFFFF"));
+            card.BorderBrush = new SolidColorBrush(selected ? Color.Parse("#4C6FFF") : Color.Parse("#D8DEE8"));
+        }
+        else
+        {
+            card.Background = new SolidColorBrush(selected ? Color.Parse("#1A2744") : Color.Parse("#121722"));
+            card.BorderBrush = new SolidColorBrush(selected ? Color.Parse("#5B7CFF") : Color.Parse("#2A3140"));
+        }
+    }
     async void Download_Click(object? sender, RoutedEventArgs e) => await StartDownload();
+    void CancelJob_Click(object? sender, RoutedEventArgs e) => jobCts?.Cancel();
     void OpenFolder_Click(object? sender, RoutedEventArgs e) => OpenTarget(File.Exists(lastOutput) ? Path.GetDirectoryName(lastOutput)! : FolderBox.Text ?? "");
     async void CheckYtDlp_Click(object? sender, RoutedEventArgs e) => await RefreshYtDlpVersions(true);
 
-    async void UpdateYtDlp_Click(object? sender, RoutedEventArgs e)
+    UpdateChannel SelectedChannel() =>
+        UpdateChannelBox.SelectedIndex == 1 ? UpdateChannel.Stable : UpdateChannel.Prerelease;
+
+    UpdateChannel LoadChannel()
     {
-        if (!File.Exists(YtDlp)) { await ShowInfo("yt-dlp is missing from the app tools folder."); return; }
+        try
+        {
+            if (File.Exists(channelFile) && File.ReadAllText(channelFile).Trim().Equals("stable", StringComparison.OrdinalIgnoreCase))
+                return UpdateChannel.Stable;
+        }
+        catch { }
+        return AppVersionInfo.DefaultChannel;
+    }
+
+    void SaveChannel()
+    {
+        try { File.WriteAllText(channelFile, SelectedChannel() == UpdateChannel.Stable ? "stable" : "prerelease"); }
+        catch { }
+    }
+
+    string LoadFolder()
+    {
+        var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        var fallback = Directory.Exists(downloads) ? downloads : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        try
+        {
+            if (File.Exists(folderFile))
+            {
+                var saved = File.ReadAllText(folderFile).Trim();
+                if (saved != "" && Directory.Exists(saved)) return saved;
+            }
+        }
+        catch { }
+        return fallback;
+    }
+
+    void SaveFolder()
+    {
+        try
+        {
+            var path = (FolderBox.Text ?? "").Trim();
+            if (path != "" && Directory.Exists(path)) File.WriteAllText(folderFile, path);
+        }
+        catch { }
+    }
+
+    async void CheckAppUpdate_Click(object? sender, RoutedEventArgs e)
+    {
+        SaveChannel();
+        CheckAppUpdateButton.IsEnabled = false;
+        DownloadAppUpdateButton.IsEnabled = false;
+        AppLatestVersion.Text = "Latest: checking GitHub Releases…";
+        AppUpdateStatus.Text = "Checking sapgun/SAPGUN-Media-Grabber releases…";
+        try
+        {
+            lastAppCheck = await appUpdates.CheckAsync(AppVersionInfo.Current, SelectedChannel());
+            AppLatestVersion.Text = lastAppCheck.LatestVersion is null ? "Latest: unavailable" : "Latest: v" + lastAppCheck.LatestVersion;
+            AppUpdateStatus.Text = lastAppCheck.Message;
+            DownloadAppUpdateButton.IsEnabled = lastAppCheck.CanDownload;
+            DownloadAppUpdateButton.Content = lastAppCheck.Asset?.ApplyAction == UpdateApplyAction.LaunchInstallerAndExit
+                ? "Download & Install"
+                : "Download Update";
+            if (!string.IsNullOrWhiteSpace(lastAppCheck.ReleaseNotes) && lastAppCheck.CanDownload)
+                AppUpdateStatus.Text = lastAppCheck.Message + "\n\n" + lastAppCheck.ReleaseNotes;
+        }
+        catch (Exception ex)
+        {
+            lastAppCheck = null;
+            AppLatestVersion.Text = "Latest: check failed";
+            AppUpdateStatus.Text = ex.Message;
+        }
+        finally { CheckAppUpdateButton.IsEnabled = true; }
+    }
+
+    async void DownloadAppUpdate_Click(object? sender, RoutedEventArgs e)
+    {
+        if (lastAppCheck is not { CanDownload: true })
+        {
+            await ShowInfo("Check for an app update first.");
+            return;
+        }
+
+        appDownloadCts?.Cancel();
+        appDownloadCts = new CancellationTokenSource();
+        var destDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        Directory.CreateDirectory(destDir);
+
+        CheckAppUpdateButton.IsEnabled = false;
+        DownloadAppUpdateButton.IsEnabled = false;
+        CancelAppUpdateButton.IsVisible = true;
+        AppUpdateProgress.IsVisible = true;
+        AppUpdateProgress.Value = 0;
+        AppUpdateStatus.Text = "Downloading update… this is never installed automatically.";
+
+        try
+        {
+            var progress = new Progress<UpdateDownloadProgress>(p =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    AppUpdateProgress.Value = p.Percent;
+                    AppUpdateStatus.Text = p.TotalBytes is > 0
+                        ? $"Downloading update — {p.Percent}% ({p.BytesReceived / 1048576.0:0.0} / {p.TotalBytes.Value / 1048576.0:0.0} MB)"
+                        : $"Downloading update — {p.BytesReceived / 1048576.0:0.0} MB";
+                });
+            });
+            var downloaded = await appUpdates.DownloadAsync(lastAppCheck, destDir, progress, appDownloadCts.Token);
+            AppUpdateProgress.Value = 100;
+
+            if (!downloaded.ChecksumVerified)
+            {
+                await ShowInfo("The update downloaded, but no SHA-256 was published for this asset.\n\nFile:\n" + downloaded.FilePath + "\n\nComputed SHA-256:\n" + downloaded.Sha256 + "\n\nIt will not be launched automatically.");
+                UpdateShell.Reveal(downloaded.FilePath);
+                AppUpdateStatus.Text = "Downloaded without a published checksum. File was revealed, not installed.";
+                return;
+            }
+
+            if (downloaded.ApplyAction == UpdateApplyAction.LaunchInstallerAndExit)
+            {
+                await ShowInfo("SHA-256 verified.\n\nThe installer will open now. This app will quit so files can be replaced.\n\nFinish the wizard to install. The new build should start when the installer closes.\n\nNothing is installed until you continue in the installer.");
+                UpdateShell.LaunchInstallerThenRelaunch(downloaded.FilePath);
+                UpdateShell.ShutdownApp();
+                return;
+            }
+
+            await ShowInfo("SHA-256 verified.\n\nThe update archive was saved to:\n" + downloaded.FilePath + "\n\nExtract and replace this build yourself. The running app will not overwrite itself.");
+            UpdateShell.Reveal(downloaded.FilePath);
+            AppUpdateStatus.Text = "Verified update saved to Downloads. Extract it to replace this build.";
+        }
+        catch (OperationCanceledException)
+        {
+            AppUpdateStatus.Text = "App update download cancelled.";
+        }
+        catch (Exception ex)
+        {
+            AppUpdateStatus.Text = "App update download failed.";
+            await ShowInfo(ex.Message);
+        }
+        finally
+        {
+            CheckAppUpdateButton.IsEnabled = true;
+            DownloadAppUpdateButton.IsEnabled = lastAppCheck?.CanDownload == true;
+            CancelAppUpdateButton.IsVisible = false;
+            AppUpdateProgress.IsVisible = false;
+        }
+    }
+
+    void CancelAppUpdate_Click(object? sender, RoutedEventArgs e) => appDownloadCts?.Cancel();
+
+    async void UpdateYtDlp_Click(object? sender, RoutedEventArgs e) => await UpdateYtDlpAsync(quiet: false);
+
+    async Task UpdateYtDlpAsync(bool quiet)
+    {
+        if (!File.Exists(YtDlp))
+        {
+            if (!quiet) await ShowInfo("yt-dlp is missing from the app tools folder.");
+            return;
+        }
         StatusText.Text = "Updating yt-dlp...";
-        var result = await RunProcess(YtDlp, new[] { "-U" }, (_, _) => { });
+        var result = await ProcessRunner.RunAsync(YtDlp, new[] { "-U" }, (_, _) => { });
         await RefreshYtDlpVersions(false);
-        await ShowInfo(result == 0 ? "yt-dlp update complete." : "yt-dlp update failed. Check your connection and try again.");
+        if (!quiet)
+            await ShowInfo(result == 0 ? "yt-dlp update complete." : "yt-dlp update failed. Check your connection and try again.");
+        else if (result != 0)
+            ProgressText.Text = "Automatic yt-dlp update failed. Use ENGINE → Update yt-dlp.";
     }
 
     async void Help_Click(object? sender, RoutedEventArgs e)
     {
-        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nTrim is optional. Everything is processed locally.");
+        await ShowInfo("Paste or drop a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nCancel stops the current yt-dlp download or FFmpeg conversion and removes leftover .part files from this job.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nAPP Check App Update looks at GitHub Releases for this application. ENGINE Check / Update yt-dlp only updates the bundled downloader. They are separate. Auto-update yt-dlp never installs an app update.\n\nApp updates are never installed silently. Portable zip/tar.gz builds are saved and revealed. The Windows Setup.exe installer is launched only after you confirm; this app quits so files can be replaced, then the new build should start when the wizard finishes.\n\nTrim is optional. Media conversion is processed locally.");
     }
 
     void Theme_Click(object? sender, RoutedEventArgs e)
@@ -132,6 +386,12 @@ public partial class MainWindow : Window
     void Feedback_Click(object? sender, RoutedEventArgs e) => OpenTarget(XProfileUrl);
     void Support_Click(object? sender, RoutedEventArgs e) => OpenTarget(KoFiUrl);
 
+    void Licenses_Click(object? sender, RoutedEventArgs e)
+    {
+        var notices = BundledLicenseLocator.FindNotices(AppContext.BaseDirectory);
+        OpenTarget(notices ?? "https://github.com/sapgun/SAPGUN-Media-Grabber/blob/main/LICENSE");
+    }
+
     bool LoadTheme()
     {
         try { return File.Exists(settingsFile) && File.ReadAllText(settingsFile).Trim().Equals("light", StringComparison.OrdinalIgnoreCase); }
@@ -142,14 +402,103 @@ public partial class MainWindow : Window
     {
         if (Application.Current != null) Application.Current.RequestedThemeVariant = lightMode ? ThemeVariant.Light : ThemeVariant.Dark;
         ThemeButton.Content = lightMode ? "Dark mode" : "Light mode";
+        Background = new SolidColorBrush(lightMode ? Color.Parse("#F4F6FA") : Color.Parse("#0B0D12"));
+        Foreground = new SolidColorBrush(lightMode ? Color.Parse("#12141A") : Color.Parse("#F2F4F8"));
+        DownloadButton.Background = new SolidColorBrush(lightMode ? Color.Parse("#4C6FFF") : Colors.White);
+        DownloadButton.Foreground = new SolidColorBrush(lightMode ? Colors.White : Color.Parse("#0B0D12"));
+        StylePanelCard(AppCard, accent: true);
+        StylePanelCard(EngineCard, accent: false);
+        RefreshProfileCards();
     }
 
-    string Mode() => OriginalProfile.IsChecked == true ? "original" : Mp4Profile.IsChecked == true ? "mp4" : this.FindControl<RadioButton>("Mp3Profile")!.IsChecked == true ? "mp3" : "x";
+    void StylePanelCard(Border card, bool accent)
+    {
+        if (lightMode)
+        {
+            card.Background = new SolidColorBrush(Color.Parse("#FFFFFF"));
+            card.BorderBrush = new SolidColorBrush(accent ? Color.Parse("#4C6FFF") : Color.Parse("#D8DEE8"));
+        }
+        else
+        {
+            card.Background = new SolidColorBrush(Color.Parse("#141822"));
+            card.BorderBrush = new SolidColorBrush(accent ? Color.Parse("#4C6FFF") : Color.Parse("#2A3140"));
+        }
+    }
+
+    string Mode() => OriginalProfile.IsChecked == true ? "original" : Mp4Profile.IsChecked == true ? "mp4" : Mp3Profile.IsChecked == true ? "mp3" : "x";
+
+    void FillCookieBrowsers()
+    {
+        var platform = PlatformDetector.Detect();
+        CookieBox.Items.Clear();
+        foreach (var browser in CookieBrowsers.ForCurrentOs())
+            CookieBox.Items.Add(new ComboBoxItem { Content = browser.Label, Tag = browser.Id });
+        CookieBox.SelectedIndex = LoadCookieIndex();
+        CookieBox.SelectionChanged += (_, _) => SaveCookie();
+        CookieHint.Text = CookieBrowsers.Hint(platform);
+    }
+
+    int LoadCookieIndex()
+    {
+        try
+        {
+            if (!File.Exists(cookieFile)) return 0;
+            var saved = File.ReadAllText(cookieFile).Trim();
+            for (var i = 0; i < CookieBox.Items.Count; i++)
+            {
+                if (CookieBox.Items[i] is ComboBoxItem item && item.Tag is string id && string.Equals(id, saved, StringComparison.Ordinal))
+                    return i;
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    void SaveCookie()
+    {
+        try
+        {
+            var id = BrowserCookie() ?? "";
+            File.WriteAllText(cookieFile, id);
+        }
+        catch { }
+    }
+
+    bool LoadEngineAutoUpdate()
+    {
+        try { return File.Exists(engineAutoFile) && File.ReadAllText(engineAutoFile).Trim().Equals("on", StringComparison.OrdinalIgnoreCase); }
+        catch { return false; }
+    }
+
+    void SaveEngineAutoUpdate()
+    {
+        try { File.WriteAllText(engineAutoFile, AutoUpdateYtDlpCheck.IsChecked == true ? "on" : "off"); }
+        catch { }
+    }
+
+    void UrlDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = HasHttpUrl(e) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    void UrlDrop(object? sender, DragEventArgs e)
+    {
+        var url = MediaUrlDrop.FirstHttpUrl(e.DataTransfer?.TryGetText());
+        if (!string.IsNullOrWhiteSpace(url))
+            UrlBox.Text = url;
+        e.Handled = true;
+    }
+
+    static bool HasHttpUrl(DragEventArgs e) =>
+        MediaUrlDrop.FirstHttpUrl(e.DataTransfer?.TryGetText()) != null;
 
     string? BrowserCookie()
     {
         if (CookieBox.SelectedIndex <= 0) return null;
-        return (CookieBox.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToLowerInvariant();
+        if (CookieBox.SelectedItem is ComboBoxItem item && item.Tag is string id && !string.IsNullOrWhiteSpace(id))
+            return id;
+        return null;
     }
 
     async Task StartDownload()
@@ -161,6 +510,10 @@ public partial class MainWindow : Window
         if (!File.Exists(YtDlp) || !File.Exists(Ffmpeg)) { await ShowInfo("Platform tools are missing. Reinstall this build or use a release that bundles yt-dlp + FFmpeg."); return; }
 
         SetBusy(true);
+        jobCts?.Cancel();
+        jobCts = new CancellationTokenSource();
+        var ct = jobCts.Token;
+        var startedUtc = DateTimeOffset.UtcNow;
         Progress.Value = 0;
         StatusText.Text = "Downloading — 0%";
         ProgressText.Text = "Starting yt-dlp...";
@@ -189,7 +542,7 @@ public partial class MainWindow : Window
 
             var errors = new StringBuilder();
             string finalPath = "";
-            var rc = await RunProcess(YtDlp, args, (line, isErr) =>
+            var rc = await ProcessRunner.RunAsync(YtDlp, args, (line, isErr) =>
             {
                 if (isErr) { lock (errors) errors.AppendLine(line); return; }
                 if (line.StartsWith("F:")) { finalPath = line[2..].Trim(); return; }
@@ -205,14 +558,14 @@ public partial class MainWindow : Window
                 var got = Clean(parts.ElementAtOrDefault(3)); var total = Clean(parts.ElementAtOrDefault(4));
                 var info = new List<string>(); if (speed != "") info.Add(speed); if (eta != "") info.Add("ETA " + eta); if (got != "" && total != "") info.Add(got + " / " + total);
                 Dispatcher.UIThread.Post(() => ProgressText.Text = info.Count == 0 ? "Downloading media..." : string.Join("  •  ", info));
-            });
+            }, ct);
 
             if (rc != 0) throw new Exception("yt-dlp failed:\n\n" + Tail(errors.ToString(), 2200));
             if (string.IsNullOrWhiteSpace(finalPath)) throw new Exception("Download completed but the output path was not reported.");
 
             if (mode == "x")
             {
-                finalPath = await ConvertForX(finalPath);
+                finalPath = await ConvertForX(finalPath, ct);
             }
 
             lastOutput = finalPath;
@@ -220,6 +573,14 @@ public partial class MainWindow : Window
             StatusText.Text = "Done — 100%";
             ProgressText.Text = Path.GetFileName(finalPath);
             OpenFolderButton.IsEnabled = true;
+            SaveFolder();
+        }
+        catch (OperationCanceledException)
+        {
+            IncompleteDownloadCleanup.DeleteLeftovers(outputDir, startedUtc);
+            Progress.Value = 0;
+            StatusText.Text = "Cancelled";
+            ProgressText.Text = "The download or conversion was stopped.";
         }
         catch (Exception ex)
         {
@@ -231,23 +592,23 @@ public partial class MainWindow : Window
         finally { SetBusy(false); }
     }
 
-    async Task<string> ConvertForX(string source)
+    async Task<string> ConvertForX(string source, CancellationToken cancellationToken)
     {
         var target = XTarget(source);
         var duration = await DurationSeconds(source);
         Dispatcher.UIThread.Post(() => { Progress.Value = 0; StatusText.Text = "Optimizing for X — 0%"; ProgressText.Text = duration > 0 ? "00:00 / " + FormatDuration(duration) : "Starting FFmpeg..."; });
 
         var errors = new StringBuilder();
-        var args = new[] { "-y", "-hide_banner", "-loglevel", "error", "-i", source, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "medium", "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p", "-vf", "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease", "-fpsmax", "30", "-crf", "20", "-maxrate", "8M", "-bufsize", "16M", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", "-f", "mp4", target };
+        var args = XReadyEncode.ConversionArgs(source, target);
 
-        var rc = await RunProcess(Ffmpeg, args, (line, isErr) =>
+        var rc = await ProcessRunner.RunAsync(Ffmpeg, args, (line, isErr) =>
         {
             if (isErr) { lock (errors) errors.AppendLine(line); return; }
             if (!line.StartsWith("out_time=")) return;
             if (!TimeSpan.TryParse(line[9..].Trim(), CultureInfo.InvariantCulture, out var current)) return;
             var pct = duration > 0 ? Math.Clamp((int)Math.Round(current.TotalSeconds / duration * 100), 0, 99) : 0;
             Dispatcher.UIThread.Post(() => { if (duration > 0) { Progress.Value = pct; StatusText.Text = $"Optimizing for X — {pct}%"; ProgressText.Text = FormatDuration(current.TotalSeconds) + " / " + FormatDuration(duration); } else ProgressText.Text = "Processed " + FormatDuration(current.TotalSeconds); });
-        });
+        }, cancellationToken);
 
         if (rc != 0) throw new Exception("FFmpeg conversion failed:\n\n" + Tail(errors.ToString(), 1800));
         try { if (File.Exists(source) && !source.Equals(target, StringComparison.OrdinalIgnoreCase)) File.Delete(source); } catch { }
@@ -276,11 +637,12 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (!File.Exists(YtDlp)) { InstalledYtDlp.Text = "Installed yt-dlp: missing"; LatestYtDlp.Text = "Latest: unknown"; return; }
+            if (!File.Exists(YtDlp)) { InstalledYtDlp.Text = "Current: missing"; LatestYtDlp.Text = "Latest: unknown"; return; }
             var installed = (await CaptureOutput(YtDlp, new[] { "--version" })).Trim();
             var latest = await LatestYtDlpVersion();
-            InstalledYtDlp.Text = "Installed yt-dlp: " + installed;
+            InstalledYtDlp.Text = "Current: " + installed;
             LatestYtDlp.Text = "Latest: " + latest;
+            RefreshToolBadges();
             if (pop) await ShowInfo(installed.TrimStart('v') == latest.TrimStart('v') ? "yt-dlp is up to date." : $"yt-dlp update available: {installed} → {latest}");
         }
         catch (Exception ex) { LatestYtDlp.Text = "Latest: check failed"; if (pop) await ShowInfo(ex.Message); }
@@ -289,7 +651,7 @@ public partial class MainWindow : Window
     static async Task<string> LatestYtDlpVersion()
     {
         using var http = new HttpClient();
-        http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SAPGUN-Media-Grabber", AppVersion));
+        http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SAPGUN-Media-Grabber", AppVersionInfo.Current));
         using var stream = await http.GetStreamAsync("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest");
         using var json = await JsonDocument.ParseAsync(stream);
         return json.RootElement.GetProperty("tag_name").GetString() ?? "unknown";
@@ -298,25 +660,16 @@ public partial class MainWindow : Window
     async Task<string> CaptureOutput(string exe, IEnumerable<string> args)
     {
         var output = new StringBuilder(); var errors = new StringBuilder();
-        var rc = await RunProcess(exe, args, (line, err) => { lock (err ? errors : output) (err ? errors : output).AppendLine(line); });
+        var rc = await ProcessRunner.RunAsync(exe, args, (line, err) => { lock (err ? errors : output) (err ? errors : output).AppendLine(line); });
         if (rc != 0) throw new Exception(Path.GetFileName(exe) + " returned " + rc + "\n" + Tail(errors.ToString(), 800));
         return output.ToString();
     }
 
-    static async Task<int> RunProcess(string exe, IEnumerable<string> args, Action<string, bool> onLine)
+    void SetBusy(bool busy)
     {
-        var psi = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in args) psi.ArgumentList.Add(arg);
-        using var process = new Process { StartInfo = psi };
-        process.Start();
-        var stdout = Task.Run(async () => { string? line; while ((line = await process.StandardOutput.ReadLineAsync()) != null) onLine(line, false); });
-        var stderr = Task.Run(async () => { string? line; while ((line = await process.StandardError.ReadLineAsync()) != null) onLine(line, true); });
-        await process.WaitForExitAsync();
-        await Task.WhenAll(stdout, stderr);
-        return process.ExitCode;
+        DownloadButton.IsEnabled = !busy;
+        CancelJobButton.IsEnabled = busy;
     }
-
-    void SetBusy(bool busy) => DownloadButton.IsEnabled = !busy;
     static string Clean(string? value) => string.IsNullOrWhiteSpace(value) || value is "NA" or "N/A" or "Unknown" ? "" : value.Trim();
     static string Tail(string value, int max) => value.Length <= max ? value : value[^max..];
     static string FormatDuration(double seconds) { var t = TimeSpan.FromSeconds(Math.Max(0, seconds)); return t.TotalHours >= 1 ? $"{(int)t.TotalHours:00}:{t.Minutes:00}:{t.Seconds:00}" : $"{(int)t.TotalMinutes:00}:{t.Seconds:00}"; }

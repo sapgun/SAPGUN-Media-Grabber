@@ -10,8 +10,8 @@ Built for the simple workflow most people actually need:
 [![View Latest Release](https://img.shields.io/badge/View-Latest%20Release-24292F?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest)
 [![Star on GitHub](https://img.shields.io/badge/★-Star%20on%20GitHub-F6C343?style=for-the-badge&logo=github&logoColor=black)](https://github.com/sapgun/SAPGUN-Media-Grabber)
 
-> **Current stable release:** Windows.  
-> **v0.3.0 alpha:** Linux x64 and macOS Apple Silicon builds now pass native GitHub Actions validation. They are not stable releases yet.
+> **Current Windows line:** Avalonia **v0.3.0** (this branch). GitHub Latest still shows v0.2.2 until the Windows Latest publisher runs.  
+> Linux and macOS remain experimental alpha packages.
 
 ## Features
 
@@ -24,7 +24,9 @@ Built for the simple workflow most people actually need:
 - Detailed **X conversion progress** — FFmpeg percentage and processed media time
 - Optional **browser cookies** for 403 / sign-in protected media
 - Shows **installed yt-dlp version vs latest**
-- **Check version** and **Update yt-dlp** buttons
+- **Check** and **Update yt-dlp** in a dedicated ENGINE section
+- **Check App Update** against GitHub Releases (separate from yt-dlp; never silent-installs)
+- Stable vs Prerelease app-update channels
 - **Dark / light mode** with local preference persistence
 - **Feedback / DM on X** → https://x.com/caro7370
 - **Support me · Ko-fi** → https://ko-fi.com/sapgun
@@ -55,7 +57,13 @@ The Avalonia/.NET Linux x64 build now passes CI on Ubuntu, including:
 - actual GUI launch under Xvfb
 - packaged `.tar.gz` artifact
 
-A public Linux download will be added to GitHub Releases after the alpha packaging flow is finalized.
+A public **v0.3.0-alpha.1** Linux x64 archive is on GitHub Releases (prerelease, not Latest). The in-app updater in this branch looks for `SAPGUN-Media-Grabber-vX.Y.Z-linux-x64.tar.gz` plus `SHA256SUMS-linux-x64.txt`.
+
+After extracting, run `./app/sapgun-media-grabber`. Optional: `./app/install-desktop.sh` writes a `.desktop` launcher into `~/.local/share/applications`.
+
+CI also builds a Linux **AppImage** (x64 and arm64). The in-app updater still prefers the `.tar.gz` when both exist.
+
+Stable users should keep using the Windows installer from **Latest Release**. Do not treat Linux alpha as production.
 
 ### macOS Apple Silicon — v0.3.0 alpha
 
@@ -69,7 +77,11 @@ The native arm64 build now passes CI on an Apple Silicon GitHub Actions runner, 
 - actual GUI process launch on macOS
 - packaged `.tar.gz` artifact
 
-The macOS build is still **alpha**. Finder launch, Gatekeeper behavior, browser-cookie UX, signing and notarization should be verified with real users before a stable release.
+A public **v0.3.0-alpha.1** macOS arm64 archive is on GitHub Releases (prerelease). The in-app updater looks for `SAPGUN-Media-Grabber-vX.Y.Z-macos-arm64.tar.gz` plus `SHA256SUMS-macos-arm64.txt`.
+
+Newer alpha tarballs also include `README-MACOS.txt` and `remove-quarantine.sh`. The app is **not signed**. Prefer right-click → Open; the script only clears the quarantine xattr if Gatekeeper still blocks launch.
+
+The macOS build is still **alpha**. Finder launch, Gatekeeper behavior, browser-cookie UX, signing and notarization should be verified with real users before a stable release. This updater **downloads and reveals** the archive; it does not replace the `.app` automatically.
 
 ## Quick use
 
@@ -139,6 +151,10 @@ The current stable Windows artifact is:
 `SAPGUN-Media-Grabber-Setup.exe`
 
 Linux and macOS artifacts will be added to the same release flow as the v0.3.0 line matures.
+
+### Maintainer: show “Publish Windows Latest” in Actions
+
+GitHub only lists **workflow_dispatch** workflows that exist on the **default branch (`main`)**. The publish job in this 0.3 branch is invisible in the Actions tab until that YAML is also on `main`. It still never runs on push; it only publishes when dispatched with `confirm=make-windows-latest`.
 
 ### Windows SmartScreen
 
