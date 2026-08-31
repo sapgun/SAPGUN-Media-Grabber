@@ -116,6 +116,18 @@ The Windows release is published as:
 
 Future macOS and Linux artifacts will be added to the same Release page, so users do not need to search for separate download pages.
 
+### Maintainer: Publish Windows Latest (Avalonia)
+
+GitHub only shows **Run workflow** for files that exist on `main`. This repository now includes `.github/workflows/publish-windows-latest-avalonia.yml`.
+
+It does **not** run on push and does **not** change Latest by itself. After this file is on `main`, open Actions → **Publish Windows Latest (Avalonia 0.3 UI)** → Run workflow, with:
+
+- `confirm` = `make-windows-latest`
+- `windows_run_id` = a green **Windows x64 v0.3.0 Alpha** run that uploaded `SAPGUN-Media-Grabber-Setup.exe`
+- `tag` = `v0.3.0` (must not already exist; must not contain alpha/beta/rc)
+
+Until that dispatch succeeds, Latest stays on the current WinForms installer.
+
 ### Windows SmartScreen
 
 Early unsigned open-source releases may trigger a Windows SmartScreen reputation warning. Source code and the GitHub Actions build workflow are public so users can inspect how the installer is produced. Code signing can be added later if distribution volume justifies it.
