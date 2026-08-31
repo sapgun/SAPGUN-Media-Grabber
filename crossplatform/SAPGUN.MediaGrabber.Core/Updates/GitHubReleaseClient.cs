@@ -26,6 +26,16 @@ public sealed class GitHubReleaseClient
             client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SAPGUN-Media-Grabber", "app-updater"));
         if (!client.DefaultRequestHeaders.Accept.Any())
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+        ApplyOptionalToken(client);
+    }
+
+    public static void ApplyOptionalToken(HttpClient client)
+    {
+        if (client.DefaultRequestHeaders.Authorization != null) return;
+        var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN")
+            ?? Environment.GetEnvironmentVariable("GH_TOKEN");
+        if (string.IsNullOrWhiteSpace(token)) return;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Trim());
     }
 
     public async Task<IReadOnlyList<GitHubRelease>> ListReleasesAsync(CancellationToken cancellationToken = default)

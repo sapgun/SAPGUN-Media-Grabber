@@ -76,6 +76,7 @@ public partial class MainWindow : Window
         Title = "SAPGUN Media Grabber v" + AppVersionInfo.Current;
         AppCurrentVersion.Text = "Current: v" + AppVersionInfo.Current;
         UpdateChannelBox.SelectedIndex = LoadChannel() == UpdateChannel.Stable ? 1 : 0;
+        UpdateChannelBox.SelectionChanged += (_, _) => SaveChannel();
         DownloadAppUpdateButton.Content = OperatingSystem.IsWindows() ? "Download & Install" : "Download Update";
         Opened += async (_, _) => await RefreshYtDlpVersions(false);
     }
