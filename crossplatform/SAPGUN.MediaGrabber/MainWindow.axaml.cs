@@ -70,6 +70,8 @@ public partial class MainWindow : Window
     Border XCard => this.FindControl<Border>("XCard")!;
     Border Mp4Card => this.FindControl<Border>("Mp4Card")!;
     Border Mp3Card => this.FindControl<Border>("Mp3Card")!;
+    Border AppCard => this.FindControl<Border>("AppCard")!;
+    Border EngineCard => this.FindControl<Border>("EngineCard")!;
 
     string lastOutput = "";
     bool lightMode;
@@ -193,6 +195,7 @@ public partial class MainWindow : Window
 
     void StyleProfileCard(Border card, bool selected)
     {
+        card.BorderThickness = new Thickness(selected ? 2 : 1);
         if (lightMode)
         {
             card.Background = new SolidColorBrush(selected ? Color.Parse("#EAF0FF") : Color.Parse("#FFFFFF"));
@@ -200,8 +203,8 @@ public partial class MainWindow : Window
         }
         else
         {
-            card.Background = new SolidColorBrush(selected ? Color.Parse("#18233A") : Color.Parse("#141822"));
-            card.BorderBrush = new SolidColorBrush(selected ? Color.Parse("#4C6FFF") : Color.Parse("#2A3140"));
+            card.Background = new SolidColorBrush(selected ? Color.Parse("#1A2744") : Color.Parse("#121722"));
+            card.BorderBrush = new SolidColorBrush(selected ? Color.Parse("#5B7CFF") : Color.Parse("#2A3140"));
         }
     }
     async void Download_Click(object? sender, RoutedEventArgs e) => await StartDownload();
@@ -393,7 +396,23 @@ public partial class MainWindow : Window
         Foreground = new SolidColorBrush(lightMode ? Color.Parse("#12141A") : Color.Parse("#F2F4F8"));
         DownloadButton.Background = new SolidColorBrush(lightMode ? Color.Parse("#4C6FFF") : Colors.White);
         DownloadButton.Foreground = new SolidColorBrush(lightMode ? Colors.White : Color.Parse("#0B0D12"));
+        StylePanelCard(AppCard, accent: true);
+        StylePanelCard(EngineCard, accent: false);
         RefreshProfileCards();
+    }
+
+    void StylePanelCard(Border card, bool accent)
+    {
+        if (lightMode)
+        {
+            card.Background = new SolidColorBrush(Color.Parse("#FFFFFF"));
+            card.BorderBrush = new SolidColorBrush(accent ? Color.Parse("#4C6FFF") : Color.Parse("#D8DEE8"));
+        }
+        else
+        {
+            card.Background = new SolidColorBrush(Color.Parse("#141822"));
+            card.BorderBrush = new SolidColorBrush(accent ? Color.Parse("#4C6FFF") : Color.Parse("#2A3140"));
+        }
     }
 
     string Mode() => OriginalProfile.IsChecked == true ? "original" : Mp4Profile.IsChecked == true ? "mp4" : Mp3Profile.IsChecked == true ? "mp3" : "x";
