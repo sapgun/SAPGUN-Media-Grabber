@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-#define MyAppVersion "0.3.0-alpha.2"
+#define MyAppVersion "0.3.0"
 #endif
 #ifndef MyAppVersionInfo
 #define MyAppVersionInfo "0.3.0"

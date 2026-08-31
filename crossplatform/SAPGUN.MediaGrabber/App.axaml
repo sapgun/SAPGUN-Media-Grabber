@@ -12,27 +12,27 @@
       <Setter Property="FontWeight" Value="SemiBold"/>
       <Setter Property="LetterSpacing" Value="0.8"/>
       <Setter Property="Opacity" Value="0.5"/>
-      <Setter Property="Margin" Value="0,10,0,4"/>
+      <Setter Property="Margin" Value="0,6,0,2"/>
     </Style>
     <Style Selector="TextBox">
-      <Setter Property="MinHeight" Value="44"/>
-      <Setter Property="CornerRadius" Value="12"/>
-      <Setter Property="Padding" Value="14,10"/>
+      <Setter Property="MinHeight" Value="36"/>
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="Padding" Value="12,8"/>
       <Setter Property="BorderThickness" Value="1"/>
     </Style>
     <Style Selector="ComboBox">
-      <Setter Property="MinHeight" Value="44"/>
-      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="MinHeight" Value="36"/>
+      <Setter Property="CornerRadius" Value="10"/>
     </Style>
     <Style Selector="Button.secondary">
-      <Setter Property="MinHeight" Value="44"/>
-      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="MinHeight" Value="36"/>
+      <Setter Property="CornerRadius" Value="10"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
-      <Setter Property="Padding" Value="16,8"/>
+      <Setter Property="Padding" Value="12,6"/>
     </Style>
     <Style Selector="Button.primary">
-      <Setter Property="MinHeight" Value="54"/>
-      <Setter Property="CornerRadius" Value="16"/>
+      <Setter Property="MinHeight" Value="48"/>
+      <Setter Property="CornerRadius" Value="14"/>
       <Setter Property="FontWeight" Value="Bold"/>
       <Setter Property="FontSize" Value="16"/>
       <Setter Property="LetterSpacing" Value="1.2"/>
@@ -56,8 +56,8 @@
       <Setter Property="BorderThickness" Value="1"/>
     </Style>
     <Style Selector="Border.profile-card">
-      <Setter Property="CornerRadius" Value="16"/>
-      <Setter Property="Padding" Value="16,14"/>
+      <Setter Property="CornerRadius" Value="14"/>
+      <Setter Property="Padding" Value="12,10"/>
       <Setter Property="Background" Value="#141822"/>
       <Setter Property="BorderBrush" Value="#2A3140"/>
       <Setter Property="BorderThickness" Value="1"/>
@@ -65,7 +65,7 @@
     </Style>
     <Style Selector="Border.badge">
       <Setter Property="CornerRadius" Value="999"/>
-      <Setter Property="Padding" Value="12,6"/>
+      <Setter Property="Padding" Value="10,4"/>
       <Setter Property="Background" Value="#163528"/>
     </Style>
     <Style Selector="Border.badge TextBlock">

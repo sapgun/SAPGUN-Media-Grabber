@@ -32,8 +32,21 @@ public class GitHubReleaseLiveTests
         Assert.Null(windowsOnAlpha);
 
         var stable = AppUpdateEvaluator.Evaluate("0.2.2", UpdateChannel.Stable, PlatformDetector.WinX64, releases);
-        Assert.Equal(UpdateCheckStatus.UpToDate, stable.Status);
-        Assert.False(stable.CanDownload);
+        var hasV030 = releases.Any(r => r.TagName == "v0.3.0" && !r.Prerelease);
+        if (hasV030)
+        {
+            Assert.Equal(UpdateCheckStatus.UpdateAvailable, stable.Status);
+            Assert.Equal("0.3.0", stable.LatestVersion);
+            Assert.True(stable.CanDownload);
+        }
+        else
+        {
+            Assert.Equal(UpdateCheckStatus.UpToDate, stable.Status);
+            Assert.False(stable.CanDownload);
+        }
+
+        var current030 = AppUpdateEvaluator.Evaluate("0.3.0", UpdateChannel.Stable, PlatformDetector.WinX64, releases);
+        Assert.Equal(hasV030 ? UpdateCheckStatus.UpToDate : UpdateCheckStatus.CurrentIsNewerThanChannel, current030.Status);
 
         var alphaCurrent = AppUpdateEvaluator.Evaluate("0.3.0-alpha.1", UpdateChannel.Prerelease, PlatformDetector.LinuxX64, releases);
         Assert.Equal(UpdateCheckStatus.UpToDate, alphaCurrent.Status);

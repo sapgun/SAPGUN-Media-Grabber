@@ -10,8 +10,8 @@ Built for the simple workflow most people actually need:
 [![View Latest Release](https://img.shields.io/badge/View-Latest%20Release-24292F?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sapgun/SAPGUN-Media-Grabber/releases/latest)
 [![Star on GitHub](https://img.shields.io/badge/★-Star%20on%20GitHub-F6C343?style=for-the-badge&logo=github&logoColor=black)](https://github.com/sapgun/SAPGUN-Media-Grabber)
 
-> **Current stable release:** Windows.  
-> **v0.3.0 alpha:** Linux x64 and macOS Apple Silicon builds now pass native GitHub Actions validation. They are not stable releases yet.
+> **Current Windows line:** Avalonia **v0.3.0** (this branch). GitHub Latest still shows v0.2.2 until the Windows Latest publisher runs.  
+> Linux and macOS remain experimental alpha packages.
 
 ## Features
 

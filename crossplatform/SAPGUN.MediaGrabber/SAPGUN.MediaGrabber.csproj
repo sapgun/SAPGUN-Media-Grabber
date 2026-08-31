@@ -7,8 +7,8 @@
     <ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('Windows'))"></ApplicationIcon>
     <AssemblyName>SAPGUN Media Grabber</AssemblyName>
     <RootNamespace>SapgunMediaGrabber</RootNamespace>
-    <Version>0.3.0-alpha.2</Version>
-    <InformationalVersion>0.3.0-alpha.2</InformationalVersion>
+    <Version>0.3.0</Version>
+    <InformationalVersion>0.3.0</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <AvaloniaNameGeneratorFilterByPath>__manual-control-lookup__</AvaloniaNameGeneratorFilterByPath>

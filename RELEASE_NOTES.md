@@ -1,4 +1,18 @@
-# v0.3.0-alpha.2 (unreleased)
+# v0.3.0 (Windows Latest candidate)
+
+Avalonia 0.3 UI for Windows Setup.exe. Same AppId as v0.2.2 so the installer upgrades the existing per-user install.
+
+### Added
+- In-app **Check App Update** against GitHub Releases (separate from yt-dlp)
+- Compact 2×2 profile cards with the download flow visible without opening extra panels
+- ENGINE yt-dlp check/update on the main screen; APP updater stays folded
+- URL drop, remembered cookie browser, optional yt-dlp auto-update on start
+- SHA-256 verification; Windows Setup.exe never silent-installs
+
+### Notes
+Linux and macOS packages stay experimental. This Windows build is local-only (yt-dlp + FFmpeg).
+
+# v0.3.0-alpha.2 (unreleased branch history)
 
 ### Added
 - In-app **Check App Update** against GitHub Releases (separate from yt-dlp)
