@@ -69,21 +69,23 @@ jobs:
           dist/windows-x64/app/tools/yt-dlp.exe --version
 
       - name: Bundle static FFmpeg + ffprobe for Windows
-        shell: bash
+        shell: pwsh
         run: |
-          curl -fL --retry 3 \
-            https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip \
-            -o /tmp/ffmpeg-win.zip
-          mkdir -p /tmp/ffmpeg-bundle
-          python -c "import zipfile; zipfile.ZipFile('/tmp/ffmpeg-win.zip').extractall('/tmp/ffmpeg-bundle')"
-          FFMPEG=$(find /tmp/ffmpeg-bundle -type f -name 'ffmpeg.exe' | head -n 1)
-          FFPROBE=$(find /tmp/ffmpeg-bundle -type f -name 'ffprobe.exe' | head -n 1)
-          test -n "$FFMPEG"
-          test -n "$FFPROBE"
-          cp "$FFMPEG" dist/windows-x64/app/tools/ffmpeg.exe
-          cp "$FFPROBE" dist/windows-x64/app/tools/ffprobe.exe
-          dist/windows-x64/app/tools/ffmpeg.exe -version | head -n 1
-          dist/windows-x64/app/tools/ffprobe.exe -version | head -n 1
+          $zip = Join-Path $env:RUNNER_TEMP 'ffmpeg-win.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'ffmpeg-bundle'
+          curl.exe -fL --retry 3 `
+            https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip `
+            -o $zip
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
+          $ffmpeg = Get-ChildItem -Path $dir -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          $ffprobe = Get-ChildItem -Path $dir -Recurse -Filter ffprobe.exe | Select-Object -First 1
+          if (-not $ffmpeg -or -not $ffprobe) { throw 'ffmpeg.exe or ffprobe.exe missing from the BtbN archive' }
+          New-Item -ItemType Directory -Force -Path 'dist/windows-x64/app/tools' | Out-Null
+          Copy-Item $ffmpeg.FullName 'dist/windows-x64/app/tools/ffmpeg.exe'
+          Copy-Item $ffprobe.FullName 'dist/windows-x64/app/tools/ffprobe.exe'
+          & 'dist/windows-x64/app/tools/ffmpeg.exe' -version | Select-Object -First 1
+          & 'dist/windows-x64/app/tools/ffprobe.exe' -version | Select-Object -First 1
 
       - name: Add Windows README
         shell: bash
@@ -98,29 +100,33 @@ jobs:
           dist/windows-x64/app/tools/ffmpeg.exe -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
 
       - name: X-ready MP4 codec smoke test
-        shell: bash
+        shell: pwsh
         run: |
-          TOOLS=dist/windows-x64/app/tools
-          "$TOOLS/ffmpeg.exe" -y -hide_banner -loglevel error \
-            -f lavfi -i 'testsrc=size=1280x720:rate=30' \
-            -f lavfi -i 'sine=frequency=1000:sample_rate=48000' \
-            -t 3 -c:v libx264 -pix_fmt yuv420p -c:a aac /tmp/source.mp4
-
-          "$TOOLS/ffmpeg.exe" -y -hide_banner -loglevel error -i /tmp/source.mp4 \
-            -map 0:v:0 -map '0:a:0?' \
-            -c:v libx264 -preset medium -profile:v high -level 4.1 \
-            -pix_fmt yuv420p -vf "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease" \
-            -fpsmax 30 -crf 20 -maxrate 8M -bufsize 16M \
-            -c:a aac -b:a 192k -ar 48000 -ac 2 -movflags +faststart \
-            /tmp/x-ready.mp4
-
-          VCODEC=$("$TOOLS/ffprobe.exe" -v error -select_streams v:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
-          PIXFMT=$("$TOOLS/ffprobe.exe" -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=nw=1:nk=1 /tmp/x-ready.mp4)
-          ACODEC=$("$TOOLS/ffprobe.exe" -v error -select_streams a:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
-          echo "video=$VCODEC pix_fmt=$PIXFMT audio=$ACODEC"
-          test "$VCODEC" = "h264"
-          test "$PIXFMT" = "yuv420p"
-          test "$ACODEC" = "aac"
+          $tools = Join-Path (Get-Location) 'dist/windows-x64/app/tools'
+          $ffmpeg = Join-Path $tools 'ffmpeg.exe'
+          $ffprobe = Join-Path $tools 'ffprobe.exe'
+          $src = Join-Path $env:RUNNER_TEMP 'source.mp4'
+          $out = Join-Path $env:RUNNER_TEMP 'x-ready.mp4'
+          & $ffmpeg -y -hide_banner -loglevel error `
+            -f lavfi -i 'testsrc=size=1280x720:rate=30' `
+            -f lavfi -i 'sine=frequency=1000:sample_rate=48000' `
+            -t 3 -c:v libx264 -pix_fmt yuv420p -c:a aac $src
+          if ($LASTEXITCODE -ne 0) { throw "source encode failed: $LASTEXITCODE" }
+          & $ffmpeg -y -hide_banner -loglevel error -i $src `
+            -map 0:v:0 -map '0:a:0?' `
+            -c:v libx264 -preset medium -profile:v high -level 4.1 `
+            -pix_fmt yuv420p -vf "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease" `
+            -fpsmax 30 -crf 20 -maxrate 8M -bufsize 16M `
+            -c:a aac -b:a 192k -ar 48000 -ac 2 -movflags +faststart `
+            $out
+          if ($LASTEXITCODE -ne 0) { throw "X-ready encode failed: $LASTEXITCODE" }
+          $vcodec = (& $ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=nw=1:nk=1 $out).Trim()
+          $pixfmt = (& $ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=nw=1:nk=1 $out).Trim()
+          $acodec = (& $ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=nw=1:nk=1 $out).Trim()
+          Write-Host "video=$vcodec pix_fmt=$pixfmt audio=$acodec"
+          if ($vcodec -ne 'h264' -or $pixfmt -ne 'yuv420p' -or $acodec -ne 'aac') {
+            throw 'X-ready output is not H.264 + AAC yuv420p'
+          }
 
       - name: GUI launch smoke test on Windows
         shell: pwsh
@@ -137,22 +143,18 @@ jobs:
           Wait-Process -Id $p.Id -ErrorAction SilentlyContinue
 
       - name: Package Windows x64 zip
-        shell: bash
+        shell: pwsh
         run: |
-          cd dist/windows-x64
-          tar.exe -a -cf "../SAPGUN-Media-Grabber-v${APP_VERSION}-windows-x64.zip" app
-          cd ../..
-          python - <<PY
-          import hashlib, os
-          name = f"SAPGUN-Media-Grabber-v{os.environ['APP_VERSION']}-windows-x64.zip"
-          path = os.path.join("dist", name)
-          digest = hashlib.sha256(open(path, "rb").read()).hexdigest()
-          out = os.path.join("dist", "SHA256SUMS-win-x64.txt")
-          open(out, "w", encoding="utf-8").write(f"{digest}  {name}\n")
-          print(open(out, encoding="utf-8").read())
-          PY
-          test -f dist/SAPGUN-Media-Grabber-v${APP_VERSION}-windows-x64.zip
-          test -f dist/SHA256SUMS-win-x64.txt
+          $name = "SAPGUN-Media-Grabber-v$($env:APP_VERSION)-windows-x64.zip"
+          Push-Location dist/windows-x64
+          tar.exe -a -cf "../$name" app
+          Pop-Location
+          $path = Join-Path 'dist' $name
+          if (-not (Test-Path $path)) { throw "missing $path" }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
+          $sums = Join-Path 'dist' 'SHA256SUMS-win-x64.txt'
+          Set-Content -LiteralPath $sums -Value "$hash  $name" -Encoding utf8
+          Get-Content $sums
 
       - name: Upload Windows alpha artifact
         uses: actions/upload-artifact@v4
