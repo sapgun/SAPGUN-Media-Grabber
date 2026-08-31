@@ -7,6 +7,10 @@ on:
     paths:
       - 'crossplatform/**'
       - '.github/workflows/macos-v0.3.0-alpha.yml'
+  pull_request:
+    paths:
+      - 'crossplatform/**'
+      - '.github/workflows/macos-v0.3.0-alpha.yml'
   workflow_dispatch:
 
 permissions:
@@ -31,10 +35,21 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj
+        run: |
+          dotnet restore crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj
+          dotnet restore crossplatform/SAPGUN.MediaGrabber.Tests/SAPGUN.MediaGrabber.Tests.csproj
 
       - name: Build
         run: dotnet build crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -c Release --no-restore
+
+      - name: Test app-update logic
+        run: dotnet test crossplatform/SAPGUN.MediaGrabber.Tests/SAPGUN.MediaGrabber.Tests.csproj -c Release --no-restore
+
+      - name: Resolve app version
+        run: |
+          APP_VERSION=$(dotnet msbuild crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -getProperty:Version -nologo | tr -d '[:space:]')
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "Resolved APP_VERSION=$APP_VERSION"
 
       - name: Create app bundle and publish self-contained osx-arm64 app
         run: |
@@ -48,7 +63,7 @@ jobs:
             -p:PublishTrimmed=false \
             -o "$APP/Contents/MacOS"
 
-          cat > "$APP/Contents/Info.plist" <<'EOF'
+          cat > "$APP/Contents/Info.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -66,7 +81,7 @@ jobs:
             <key>CFBundleShortVersionString</key>
             <string>0.3.0</string>
             <key>CFBundleVersion</key>
-            <string>0.3.0-alpha.1</string>
+            <string>${APP_VERSION}</string>
             <key>LSMinimumSystemVersion</key>
             <string>14.0</string>
             <key>NSHighResolutionCapable</key>
@@ -168,15 +183,15 @@ jobs:
       - name: Package macOS Apple Silicon alpha
         run: |
           cd dist/macos-arm64
-          tar -czf ../SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz 'SAPGUN Media Grabber.app'
+          tar -czf ../SAPGUN-Media-Grabber-v${APP_VERSION}-macos-arm64.tar.gz 'SAPGUN Media Grabber.app'
           cd ..
-          shasum -a 256 SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz | tee SHA256SUMS-macos-arm64.txt
+          shasum -a 256 SAPGUN-Media-Grabber-v${APP_VERSION}-macos-arm64.tar.gz | tee SHA256SUMS-macos-arm64.txt
 
       - name: Upload macOS alpha artifact
         uses: actions/upload-artifact@v4
         with:
           name: SAPGUN-Media-Grabber-macos-arm64-alpha
           path: |
-            dist/SAPGUN-Media-Grabber-v0.3.0-alpha.1-macos-arm64.tar.gz
+            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-macos-arm64.tar.gz
             dist/SHA256SUMS-macos-arm64.txt
           if-no-files-found: error

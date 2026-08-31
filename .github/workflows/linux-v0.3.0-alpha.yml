@@ -7,6 +7,10 @@ on:
     paths:
       - 'crossplatform/**'
       - '.github/workflows/linux-v0.3.0-alpha.yml'
+  pull_request:
+    paths:
+      - 'crossplatform/**'
+      - '.github/workflows/linux-v0.3.0-alpha.yml'
   workflow_dispatch:
 
 permissions:
@@ -31,10 +35,21 @@ jobs:
           sudo apt-get install -y xvfb xz-utils
 
       - name: Restore
-        run: dotnet restore crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj
+        run: |
+          dotnet restore crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj
+          dotnet restore crossplatform/SAPGUN.MediaGrabber.Tests/SAPGUN.MediaGrabber.Tests.csproj
 
       - name: Build
         run: dotnet build crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -c Release --no-restore
+
+      - name: Test app-update logic
+        run: dotnet test crossplatform/SAPGUN.MediaGrabber.Tests/SAPGUN.MediaGrabber.Tests.csproj -c Release --no-restore
+
+      - name: Resolve app version
+        run: |
+          APP_VERSION=$(dotnet msbuild crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -getProperty:Version -nologo | tr -d '[:space:]')
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "Resolved APP_VERSION=$APP_VERSION"
 
       - name: Publish self-contained linux-x64 app
         run: |
@@ -83,8 +98,8 @@ jobs:
           sed -i 's/^          //' dist/linux-x64/app/sapgun-media-grabber
           chmod +x dist/linux-x64/app/sapgun-media-grabber
 
-          cat > dist/linux-x64/app/README-LINUX.txt <<'EOF'
-          SAPGUN Media Grabber v0.3.0-alpha.1 — Linux x64
+          cat > dist/linux-x64/app/README-LINUX.txt <<EOF
+          SAPGUN Media Grabber v${APP_VERSION} — Linux x64
 
           Run:
             ./sapgun-media-grabber
@@ -122,14 +137,14 @@ jobs:
 
       - name: Package Linux x64 tarball
         run: |
-          tar -C dist/linux-x64 -czf dist/SAPGUN-Media-Grabber-v0.3.0-alpha.1-linux-x64.tar.gz app
-          sha256sum dist/SAPGUN-Media-Grabber-v0.3.0-alpha.1-linux-x64.tar.gz | tee dist/SHA256SUMS-linux-x64.txt
+          tar -C dist/linux-x64 -czf dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.tar.gz app
+          sha256sum dist/SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.tar.gz | tee dist/SHA256SUMS-linux-x64.txt
 
       - name: Upload Linux alpha artifact
         uses: actions/upload-artifact@v4
         with:
           name: SAPGUN-Media-Grabber-linux-x64-alpha
           path: |
-            dist/SAPGUN-Media-Grabber-v0.3.0-alpha.1-linux-x64.tar.gz
+            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-linux-x64.tar.gz
             dist/SHA256SUMS-linux-x64.txt
           if-no-files-found: error

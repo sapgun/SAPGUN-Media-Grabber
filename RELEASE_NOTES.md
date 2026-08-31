@@ -1,3 +1,18 @@
+# v0.3.0-alpha.2 (unreleased)
+
+### Added
+- In-app **Check App Update** against GitHub Releases (separate from yt-dlp)
+- Stable vs Prerelease update channels
+- Strict platform asset matching (`Setup.exe`, `linux-x64.tar.gz`, `macos-arm64.tar.gz`)
+- SHA-256 verification when a digest or `SHA256SUMS-*.txt` is published
+- Windows: download installer, verify, launch installer only after confirmation, then quit
+- Linux / macOS: download the matching tar.gz, verify, reveal the file (no self-replace)
+
+### Notes
+This is a prerelease of the Avalonia cross-platform line. Windows v0.2.2 remains the stable installer.
+
+App updates are never installed silently.
+
 # v0.2.2
 
 ### Added

@@ -24,7 +24,9 @@ Built for the simple workflow most people actually need:
 - Detailed **X conversion progress** — FFmpeg percentage and processed media time
 - Optional **browser cookies** for 403 / sign-in protected media
 - Shows **installed yt-dlp version vs latest**
-- **Check version** and **Update yt-dlp** buttons
+- **Check** and **Update yt-dlp** in a dedicated ENGINE section
+- **Check App Update** against GitHub Releases (separate from yt-dlp; never silent-installs)
+- Stable vs Prerelease app-update channels
 - **Dark / light mode** with local preference persistence
 - **Feedback / DM on X** → https://x.com/caro7370
 - **Support me · Ko-fi** → https://ko-fi.com/sapgun
@@ -55,7 +57,9 @@ The Avalonia/.NET Linux x64 build now passes CI on Ubuntu, including:
 - actual GUI launch under Xvfb
 - packaged `.tar.gz` artifact
 
-A public Linux download will be added to GitHub Releases after the alpha packaging flow is finalized.
+A public **v0.3.0-alpha.1** Linux x64 archive is on GitHub Releases (prerelease, not Latest). The in-app updater in this branch looks for `SAPGUN-Media-Grabber-vX.Y.Z-linux-x64.tar.gz` plus `SHA256SUMS-linux-x64.txt`.
+
+Stable users should keep using the Windows installer from **Latest Release**. Do not treat Linux alpha as production.
 
 ### macOS Apple Silicon — v0.3.0 alpha
 
@@ -69,7 +73,9 @@ The native arm64 build now passes CI on an Apple Silicon GitHub Actions runner, 
 - actual GUI process launch on macOS
 - packaged `.tar.gz` artifact
 
-The macOS build is still **alpha**. Finder launch, Gatekeeper behavior, browser-cookie UX, signing and notarization should be verified with real users before a stable release.
+A public **v0.3.0-alpha.1** macOS arm64 archive is on GitHub Releases (prerelease). The in-app updater looks for `SAPGUN-Media-Grabber-vX.Y.Z-macos-arm64.tar.gz` plus `SHA256SUMS-macos-arm64.txt`.
+
+The macOS build is still **alpha**. Finder launch, Gatekeeper behavior, browser-cookie UX, signing and notarization should be verified with real users before a stable release. This updater **downloads and reveals** the archive; it does not replace the `.app` automatically.
 
 ## Quick use
 
