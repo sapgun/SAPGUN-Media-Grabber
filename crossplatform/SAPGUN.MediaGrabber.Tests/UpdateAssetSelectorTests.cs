@@ -48,7 +48,7 @@ public class UpdateAssetSelectorTests
     }
 
     [Fact]
-    public void SelectsWindowsInstallerExactly()
+    public void SelectsWindowsInstallerWhenNoPortableZip()
     {
         var selected = UpdateAssetSelector.Select(Release(
             Asset("SAPGUN-Media-Grabber-Setup.exe"),
@@ -58,6 +58,21 @@ public class UpdateAssetSelectorTests
         Assert.Equal(UpdateAssetSelector.WindowsInstallerName, selected!.Package.Name);
         Assert.Equal(UpdateApplyAction.LaunchInstallerAndExit, selected.ApplyAction);
         Assert.Null(selected.ChecksumFile);
+    }
+
+    [Fact]
+    public void PrefersWindowsPortableZipOverInstaller()
+    {
+        var selected = UpdateAssetSelector.Select(Release(
+            Asset("SAPGUN-Media-Grabber-Setup.exe"),
+            Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-windows-x64.zip", "sha256:" + new string('a', 64)),
+            Asset("SHA256SUMS-win-x64.txt")),
+            PlatformDetector.WinX64);
+
+        Assert.NotNull(selected);
+        Assert.Equal("SAPGUN-Media-Grabber-v0.3.0-alpha.2-windows-x64.zip", selected!.Package.Name);
+        Assert.Equal("SHA256SUMS-win-x64.txt", selected.ChecksumFile?.Name);
+        Assert.Equal(UpdateApplyAction.RevealDownload, selected.ApplyAction);
     }
 
     [Fact]

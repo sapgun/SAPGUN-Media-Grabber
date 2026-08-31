@@ -97,7 +97,7 @@ public partial class MainWindow : Window
         AppCurrentVersion.Text = "Current: v" + AppVersionInfo.Current;
         UpdateChannelBox.SelectedIndex = LoadChannel() == UpdateChannel.Stable ? 1 : 0;
         UpdateChannelBox.SelectionChanged += (_, _) => SaveChannel();
-        DownloadAppUpdateButton.Content = OperatingSystem.IsWindows() ? "Download & Install" : "Download Update";
+        DownloadAppUpdateButton.Content = "Download Update";
         TrimCheck.IsCheckedChanged += (_, _) => ApplyTrimEnabled();
         ApplyTrimEnabled();
         RefreshToolBadges();
@@ -271,6 +271,9 @@ public partial class MainWindow : Window
             AppLatestVersion.Text = lastAppCheck.LatestVersion is null ? "Latest: unavailable" : "Latest: v" + lastAppCheck.LatestVersion;
             AppUpdateStatus.Text = lastAppCheck.Message;
             DownloadAppUpdateButton.IsEnabled = lastAppCheck.CanDownload;
+            DownloadAppUpdateButton.Content = lastAppCheck.Asset?.ApplyAction == UpdateApplyAction.LaunchInstallerAndExit
+                ? "Download & Install"
+                : "Download Update";
             if (!string.IsNullOrWhiteSpace(lastAppCheck.ReleaseNotes) && lastAppCheck.CanDownload)
                 AppUpdateStatus.Text = lastAppCheck.Message + "\n\n" + lastAppCheck.ReleaseNotes;
         }
@@ -369,7 +372,7 @@ public partial class MainWindow : Window
 
     async void Help_Click(object? sender, RoutedEventArgs e)
     {
-        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nCancel stops the current yt-dlp download or FFmpeg conversion.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nAPP Check App Update looks at GitHub Releases for this application. ENGINE Check / Update yt-dlp only updates the bundled downloader. They are separate.\n\nApp updates are never installed silently. On Linux and macOS the archive is saved and revealed. On Windows the installer is launched only after you confirm.\n\nTrim is optional. Media conversion is processed locally.");
+        await ShowInfo("Paste a media URL, choose a profile, then Download.\n\nX / Twitter 1080p converts to H.264 + AAC for reliable uploads.\n\nCancel stops the current yt-dlp download or FFmpeg conversion and removes leftover .part files from this job.\n\nIf a site returns 403 or requires login, choose the browser where you are signed in under Browser Cookies.\n\nAPP Check App Update looks at GitHub Releases for this application. ENGINE Check / Update yt-dlp only updates the bundled downloader. They are separate.\n\nApp updates are never installed silently. Portable zip/tar.gz builds are saved and revealed. The Windows Setup.exe installer is launched only after you confirm.\n\nTrim is optional. Media conversion is processed locally.");
     }
 
     void Theme_Click(object? sender, RoutedEventArgs e)
@@ -447,6 +450,7 @@ public partial class MainWindow : Window
         jobCts?.Cancel();
         jobCts = new CancellationTokenSource();
         var ct = jobCts.Token;
+        var startedUtc = DateTimeOffset.UtcNow;
         Progress.Value = 0;
         StatusText.Text = "Downloading — 0%";
         ProgressText.Text = "Starting yt-dlp...";
@@ -510,6 +514,7 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException)
         {
+            IncompleteDownloadCleanup.DeleteLeftovers(outputDir, startedUtc);
             Progress.Value = 0;
             StatusText.Text = "Cancelled";
             ProgressText.Text = "The download or conversion was stopped.";

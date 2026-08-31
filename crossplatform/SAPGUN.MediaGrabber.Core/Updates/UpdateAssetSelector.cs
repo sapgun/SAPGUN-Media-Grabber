@@ -9,24 +9,20 @@ public static class UpdateAssetSelector
 
     static readonly Regex LinuxPackage = new(@"^SAPGUN-Media-Grabber-v.+-linux-x64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     static readonly Regex MacosArm64Package = new(@"^SAPGUN-Media-Grabber-v.+-macos-arm64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    static readonly Regex WindowsZipPackage = new(@"^SAPGUN-Media-Grabber-v.+-windows-x64\.zip$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public static SelectedUpdateAsset? Select(GitHubRelease release, string platform)
     {
         if (!PlatformDetector.IsSupported(platform)) return null;
 
-        var expectedName = ExpectedPackageName(release.TagName, platform);
-        GitHubAsset? package = null;
-        foreach (var asset in release.Assets)
-        {
-            if (MatchesPackage(asset.Name, platform, expectedName))
-            {
-                if (package != null) return null;
-                package = asset;
-            }
-        }
+        var package = platform == PlatformDetector.WinX64
+            ? SelectWindowsPackage(release)
+            : SelectNamedPackage(release, platform);
         if (package is null) return null;
 
-        var checksumName = ExpectedChecksumName(platform);
+        var checksumName = package.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : ExpectedChecksumName(platform);
         var checksum = checksumName == null
             ? null
             : release.Assets.FirstOrDefault(a => string.Equals(a.Name, checksumName, StringComparison.Ordinal));
@@ -37,21 +33,69 @@ public static class UpdateAssetSelector
             ChecksumFile = checksum,
             ExpectedSha256 = DigestSha256(package.Digest),
             Platform = platform,
-            ApplyAction = PlatformDetector.ApplyAction(platform)
+            ApplyAction = package.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                ? UpdateApplyAction.LaunchInstallerAndExit
+                : UpdateApplyAction.RevealDownload
         };
+    }
+
+    static GitHubAsset? SelectWindowsPackage(GitHubRelease release)
+    {
+        var zipName = ExpectedWindowsZipName(release.TagName);
+        GitHubAsset? zip = null;
+        GitHubAsset? installer = null;
+        foreach (var asset in release.Assets)
+        {
+            if (string.Equals(asset.Name, zipName, StringComparison.Ordinal) && WindowsZipPackage.IsMatch(asset.Name))
+            {
+                if (zip != null) return null;
+                zip = asset;
+            }
+            else if (string.Equals(asset.Name, WindowsInstallerName, StringComparison.Ordinal))
+            {
+                if (installer != null) return null;
+                installer = asset;
+            }
+        }
+        return zip ?? installer;
+    }
+
+    static GitHubAsset? SelectNamedPackage(GitHubRelease release, string platform)
+    {
+        var expectedName = ExpectedPackageName(release.TagName, platform);
+        GitHubAsset? package = null;
+        foreach (var asset in release.Assets)
+        {
+            if (!MatchesPackage(asset.Name, platform, expectedName)) continue;
+            if (package != null) return null;
+            package = asset;
+        }
+        return package;
+    }
+
+    public static string ExpectedWindowsZipName(string tagName)
+    {
+        var tag = NormalizeTag(tagName);
+        return $"SAPGUN-Media-Grabber-{tag}-windows-x64.zip";
     }
 
     public static string ExpectedPackageName(string tagName, string platform)
     {
-        var tag = tagName.Trim();
-        if (!tag.StartsWith('v')) tag = "v" + tag;
+        var tag = NormalizeTag(tagName);
         return platform switch
         {
-            PlatformDetector.WinX64 => WindowsInstallerName,
+            PlatformDetector.WinX64 => ExpectedWindowsZipName(tag),
             PlatformDetector.LinuxX64 => $"SAPGUN-Media-Grabber-{tag}-linux-x64.tar.gz",
             PlatformDetector.OsxArm64 => $"SAPGUN-Media-Grabber-{tag}-macos-arm64.tar.gz",
             _ => ""
         };
+    }
+
+    static string NormalizeTag(string tagName)
+    {
+        var tag = tagName.Trim();
+        if (!tag.StartsWith('v')) tag = "v" + tag;
+        return tag;
     }
 
     public static string? ExpectedChecksumName(string platform) => platform switch
@@ -67,7 +111,7 @@ public static class UpdateAssetSelector
         if (string.Equals(name, expectedName, StringComparison.Ordinal)) return true;
         return platform switch
         {
-            PlatformDetector.WinX64 => string.Equals(name, WindowsInstallerName, StringComparison.Ordinal),
+            PlatformDetector.WinX64 => string.Equals(name, expectedName, StringComparison.Ordinal) || string.Equals(name, WindowsInstallerName, StringComparison.Ordinal),
             PlatformDetector.LinuxX64 => LinuxPackage.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
             PlatformDetector.OsxArm64 => MacosArm64Package.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
             _ => false

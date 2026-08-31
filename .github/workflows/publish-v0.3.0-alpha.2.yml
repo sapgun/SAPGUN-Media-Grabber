@@ -18,6 +18,11 @@ on:
         description: 'Successful run ID of "macOS Apple Silicon v0.3.0 Alpha" that uploaded macos-arm64-alpha artifacts'
         required: true
         type: string
+      windows_run_id:
+        description: 'Optional successful run ID of "Windows x64 v0.3.0 Alpha". Leave empty to publish Linux+macOS only.'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -55,6 +60,14 @@ jobs:
             -n SAPGUN-Media-Grabber-macos-arm64-alpha \
             -D release
 
+      - name: Download validated Windows CI artifacts
+        if: ${{ inputs.windows_run_id != '' }}
+        run: |
+          gh run download "${{ inputs.windows_run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            -n SAPGUN-Media-Grabber-windows-x64-alpha \
+            -D release
+
       - name: Verify expected alpha.2 filenames
         run: |
           ls -lah release
@@ -62,10 +75,17 @@ jobs:
           test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-arm64.tar.gz
           test -f release/SHA256SUMS-linux-x64.txt
           test -f release/SHA256SUMS-macos-arm64.txt
+          test ! -e release/SAPGUN-Media-Grabber-Setup.exe
           echo '--- Linux checksum ---'
           cat release/SHA256SUMS-linux-x64.txt
           echo '--- macOS checksum ---'
           cat release/SHA256SUMS-macos-arm64.txt
+          if [ -n "${{ inputs.windows_run_id }}" ]; then
+            test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-windows-x64.zip
+            test -f release/SHA256SUMS-win-x64.txt
+            echo '--- Windows checksum ---'
+            cat release/SHA256SUMS-win-x64.txt
+          fi
 
       - name: Write release notes
         run: |
@@ -83,8 +103,13 @@ jobs:
           - Strict platform asset matching
           - SHA-256 verification when a digest or SHA256SUMS file is published
           - Never silent-installs
-          - Windows: download installer → verify → launch installer after confirmation → quit
-          - Linux / macOS: download matching tar.gz → verify → reveal in Downloads
+          - Windows Setup.exe: download installer → verify → launch installer after confirmation → quit
+          - Windows portable zip / Linux / macOS: download matching archive → verify → reveal in Downloads
+
+          ## Windows x64 — Avalonia Alpha (optional)
+
+          If this release includes `SAPGUN-Media-Grabber-v0.3.0-alpha.2-windows-x64.zip`, it is a portable Avalonia build.
+          It does **not** replace Latest `SAPGUN-Media-Grabber-Setup.exe` (WinForms v0.2.2).
 
           ## Linux x64 — Alpha
 

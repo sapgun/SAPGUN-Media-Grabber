@@ -1,0 +1,164 @@
+name: Windows x64 v0.3.0 Alpha
+
+on:
+  push:
+    branches:
+      - feature/cross-platform-v0.3.0
+    paths:
+      - 'crossplatform/**'
+      - '.github/workflows/windows-v0.3.0-alpha.yml'
+  pull_request:
+    paths:
+      - 'crossplatform/**'
+      - '.github/workflows/windows-v0.3.0-alpha.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-x64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: |
+          dotnet restore crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj
+          dotnet restore crossplatform/SAPGUN.MediaGrabber.Tests/SAPGUN.MediaGrabber.Tests.csproj
+
+      - name: Build
+        run: dotnet build crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -c Release --no-restore
+
+      - name: Test app-update logic
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: dotnet test crossplatform/SAPGUN.MediaGrabber.Tests/SAPGUN.MediaGrabber.Tests.csproj -c Release --no-restore
+
+      - name: Resolve app version
+        shell: bash
+        run: |
+          APP_VERSION=$(dotnet msbuild crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj -getProperty:Version -nologo | tr -d '[:space:]')
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "Resolved APP_VERSION=$APP_VERSION"
+
+      - name: Publish self-contained win-x64 app
+        run: |
+          dotnet publish crossplatform/SAPGUN.MediaGrabber/SAPGUN.MediaGrabber.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -p:PublishTrimmed=false `
+            -o dist/windows-x64/app
+
+      - name: Bundle latest yt-dlp for Windows
+        shell: bash
+        run: |
+          mkdir -p dist/windows-x64/app/tools
+          curl -fL --retry 3 \
+            https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe \
+            -o dist/windows-x64/app/tools/yt-dlp.exe
+          dist/windows-x64/app/tools/yt-dlp.exe --version
+
+      - name: Bundle static FFmpeg + ffprobe for Windows
+        shell: bash
+        run: |
+          curl -fL --retry 3 \
+            https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip \
+            -o /tmp/ffmpeg-win.zip
+          mkdir -p /tmp/ffmpeg-bundle
+          python -c "import zipfile; zipfile.ZipFile('/tmp/ffmpeg-win.zip').extractall('/tmp/ffmpeg-bundle')"
+          FFMPEG=$(find /tmp/ffmpeg-bundle -type f -name 'ffmpeg.exe' | head -n 1)
+          FFPROBE=$(find /tmp/ffmpeg-bundle -type f -name 'ffprobe.exe' | head -n 1)
+          test -n "$FFMPEG"
+          test -n "$FFPROBE"
+          cp "$FFMPEG" dist/windows-x64/app/tools/ffmpeg.exe
+          cp "$FFPROBE" dist/windows-x64/app/tools/ffprobe.exe
+          dist/windows-x64/app/tools/ffmpeg.exe -version | head -n 1
+          dist/windows-x64/app/tools/ffprobe.exe -version | head -n 1
+
+      - name: Add Windows README
+        shell: bash
+        run: |
+          cp crossplatform/packaging/windows/README-WINDOWS.txt dist/windows-x64/app/README-WINDOWS.txt
+          test -f dist/windows-x64/app/README-WINDOWS.txt
+          test -f 'dist/windows-x64/app/SAPGUN Media Grabber.exe'
+          test -f dist/windows-x64/app/tools/yt-dlp.exe
+          test -f dist/windows-x64/app/tools/ffmpeg.exe
+          test -f dist/windows-x64/app/tools/ffprobe.exe
+          dist/windows-x64/app/tools/ffmpeg.exe -hide_banner -encoders 2>/dev/null | grep -q libx264
+          dist/windows-x64/app/tools/ffmpeg.exe -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
+
+      - name: X-ready MP4 codec smoke test
+        shell: bash
+        run: |
+          TOOLS=dist/windows-x64/app/tools
+          "$TOOLS/ffmpeg.exe" -y -hide_banner -loglevel error \
+            -f lavfi -i 'testsrc=size=1280x720:rate=30' \
+            -f lavfi -i 'sine=frequency=1000:sample_rate=48000' \
+            -t 3 -c:v libx264 -pix_fmt yuv420p -c:a aac /tmp/source.mp4
+
+          "$TOOLS/ffmpeg.exe" -y -hide_banner -loglevel error -i /tmp/source.mp4 \
+            -map 0:v:0 -map '0:a:0?' \
+            -c:v libx264 -preset medium -profile:v high -level 4.1 \
+            -pix_fmt yuv420p -vf "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease" \
+            -fpsmax 30 -crf 20 -maxrate 8M -bufsize 16M \
+            -c:a aac -b:a 192k -ar 48000 -ac 2 -movflags +faststart \
+            /tmp/x-ready.mp4
+
+          VCODEC=$("$TOOLS/ffprobe.exe" -v error -select_streams v:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          PIXFMT=$("$TOOLS/ffprobe.exe" -v error -select_streams v:0 -show_entries stream=pix_fmt -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          ACODEC=$("$TOOLS/ffprobe.exe" -v error -select_streams a:0 -show_entries stream=codec_name -of default=nw=1:nk=1 /tmp/x-ready.mp4)
+          echo "video=$VCODEC pix_fmt=$PIXFMT audio=$ACODEC"
+          test "$VCODEC" = "h264"
+          test "$PIXFMT" = "yuv420p"
+          test "$ACODEC" = "aac"
+
+      - name: GUI launch smoke test on Windows
+        shell: pwsh
+        run: |
+          $bin = Join-Path (Get-Location) 'dist/windows-x64/app/SAPGUN Media Grabber.exe'
+          $p = Start-Process -FilePath $bin -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) {
+            Write-Host "GUI exited early with code $($p.ExitCode)"
+            exit $(if ($p.ExitCode -eq 0) { 1 } else { $p.ExitCode })
+          }
+          Write-Host "GUI process stayed alive on Windows x64."
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          Wait-Process -Id $p.Id -ErrorAction SilentlyContinue
+
+      - name: Package Windows x64 zip
+        shell: bash
+        run: |
+          cd dist/windows-x64
+          tar.exe -a -cf "../SAPGUN-Media-Grabber-v${APP_VERSION}-windows-x64.zip" app
+          cd ../..
+          python - <<PY
+          import hashlib, os
+          name = f"SAPGUN-Media-Grabber-v{os.environ['APP_VERSION']}-windows-x64.zip"
+          path = os.path.join("dist", name)
+          digest = hashlib.sha256(open(path, "rb").read()).hexdigest()
+          out = os.path.join("dist", "SHA256SUMS-win-x64.txt")
+          open(out, "w", encoding="utf-8").write(f"{digest}  {name}\n")
+          print(open(out, encoding="utf-8").read())
+          PY
+          test -f dist/SAPGUN-Media-Grabber-v${APP_VERSION}-windows-x64.zip
+          test -f dist/SHA256SUMS-win-x64.txt
+
+      - name: Upload Windows alpha artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SAPGUN-Media-Grabber-windows-x64-alpha
+          path: |
+            dist/SAPGUN-Media-Grabber-v${{ env.APP_VERSION }}-windows-x64.zip
+            dist/SHA256SUMS-win-x64.txt
+          if-no-files-found: error

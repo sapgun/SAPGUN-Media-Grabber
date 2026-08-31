@@ -61,6 +61,20 @@ public class AppUpdateEvaluatorTests
     }
 
     [Fact]
+    public void PrereleaseWindowsPrefersPortableZip()
+    {
+        var result = AppUpdateEvaluator.Evaluate("0.3.0-alpha.1", UpdateChannel.Prerelease, PlatformDetector.WinX64, new[]
+        {
+            Rel("v0.2.2", false, false, "SAPGUN-Media-Grabber-Setup.exe"),
+            Rel("v0.3.0-alpha.2", true, false, "SAPGUN-Media-Grabber-v0.3.0-alpha.2-windows-x64.zip", "SHA256SUMS-win-x64.txt")
+        });
+        Assert.Equal(UpdateCheckStatus.UpdateAvailable, result.Status);
+        Assert.True(result.CanDownload);
+        Assert.Equal("SAPGUN-Media-Grabber-v0.3.0-alpha.2-windows-x64.zip", result.Asset!.Package.Name);
+        Assert.Equal(UpdateApplyAction.RevealDownload, result.Asset.ApplyAction);
+    }
+
+    [Fact]
     public void MissingPlatformAssetIsNotDownloadable()
     {
         var result = AppUpdateEvaluator.Evaluate("0.3.0-alpha.1", UpdateChannel.Prerelease, PlatformDetector.WinX64, new[]
