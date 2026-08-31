@@ -13,6 +13,9 @@ Two Windows packages exist:
 Both bundle yt-dlp, FFmpeg, and ffprobe. You do not need to install
 .NET, Python, or FFmpeg separately.
 
+Licenses in this folder: LICENSE.txt (this app, MIT),
+THIRD_PARTY_NOTICES.txt, FFmpeg-LICENSE.txt, yt-dlp-LICENSE.txt.
+
 GitHub Latest is only replaced when a non-prerelease Setup.exe is
 published. Until that dispatch runs, Latest remains v0.2.2.
 

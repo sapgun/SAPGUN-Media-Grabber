@@ -362,6 +362,12 @@ public partial class MainWindow : Window
     void Feedback_Click(object? sender, RoutedEventArgs e) => OpenTarget(XProfileUrl);
     void Support_Click(object? sender, RoutedEventArgs e) => OpenTarget(KoFiUrl);
 
+    void Licenses_Click(object? sender, RoutedEventArgs e)
+    {
+        var notices = BundledLicenseLocator.FindNotices(AppContext.BaseDirectory);
+        OpenTarget(notices ?? "https://github.com/sapgun/SAPGUN-Media-Grabber/blob/main/LICENSE");
+    }
+
     bool LoadTheme()
     {
         try { return File.Exists(settingsFile) && File.ReadAllText(settingsFile).Trim().Equals("light", StringComparison.OrdinalIgnoreCase); }

@@ -86,6 +86,13 @@ jobs:
           cp "$FFMPEG" dist/linux-x64/app/tools/ffmpeg
           cp "$FFPROBE" dist/linux-x64/app/tools/ffprobe
           chmod +x dist/linux-x64/app/tools/ffmpeg dist/linux-x64/app/tools/ffprobe
+          FFLIC=$(find /tmp/ffmpeg-bundle -type f \( -iname 'LICENSE*' -o -iname 'COPYING*' \) | head -n 1)
+          test -n "$FFLIC"
+          cp "$FFLIC" dist/linux-x64/app/FFmpeg-LICENSE.txt
+          curl -fL --retry 3 https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/LICENSE \
+            -o dist/linux-x64/app/yt-dlp-LICENSE.txt
+          cp crossplatform/packaging/THIRD_PARTY_NOTICES.txt dist/linux-x64/app/THIRD_PARTY_NOTICES.txt
+          cp LICENSE dist/linux-x64/app/LICENSE.txt
           dist/linux-x64/app/tools/ffmpeg -version | head -n 1
           dist/linux-x64/app/tools/ffprobe -version | head -n 1
 
@@ -112,6 +119,10 @@ jobs:
           This build is self-contained and bundles yt-dlp, FFmpeg and ffprobe.
           No system Python, yt-dlp, FFmpeg or .NET installation is required.
 
+          An AppImage is also produced: SAPGUN-Media-Grabber-v${APP_VERSION}-linux-x64.AppImage
+
+          Licenses: LICENSE.txt, THIRD_PARTY_NOTICES.txt, FFmpeg-LICENSE.txt, yt-dlp-LICENSE.txt
+
           X / Twitter 1080p mode outputs an upload-friendly H.264 + AAC MP4.
 
           Feedback: https://x.com/caro7370
@@ -137,6 +148,10 @@ jobs:
           test -x dist/linux-x64/app/tools/yt-dlp
           test -x dist/linux-x64/app/tools/ffmpeg
           test -x dist/linux-x64/app/tools/ffprobe
+          test -s dist/linux-x64/app/FFmpeg-LICENSE.txt
+          test -s dist/linux-x64/app/yt-dlp-LICENSE.txt
+          test -s dist/linux-x64/app/THIRD_PARTY_NOTICES.txt
+          test -s dist/linux-x64/app/LICENSE.txt
 
       - name: X-ready MP4 codec smoke test
         run: |

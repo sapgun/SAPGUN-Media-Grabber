@@ -149,6 +149,7 @@
             <Button x:Name="ThemeButton" Grid.Column="0" Classes="secondary" Content="Light mode" Click="Theme_Click"/>
             <Button Grid.Column="1" Classes="secondary" Content="Feedback / DM on X" Click="Feedback_Click"/>
           </Grid>
+          <Button Classes="link" Content="Third-party licenses" Click="Licenses_Click"/>
         </StackPanel>
       </Expander>
 

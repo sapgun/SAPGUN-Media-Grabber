@@ -113,6 +113,10 @@ jobs:
           curl -fL --retry 3 "$BASE/ffprobe-darwin-x64" -o "$TOOLS/ffprobe"
           curl -fL --retry 3 "$BASE/darwin-x64.LICENSE" -o "$RES/FFmpeg-LICENSE.txt"
           curl -fL --retry 3 "$BASE/darwin-x64.README" -o "$RES/FFmpeg-BUILD-INFO.txt"
+          curl -fL --retry 3 https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/LICENSE \
+            -o "$RES/yt-dlp-LICENSE.txt"
+          cp crossplatform/packaging/THIRD_PARTY_NOTICES.txt "$RES/THIRD_PARTY_NOTICES.txt"
+          cp LICENSE "$RES/LICENSE.txt"
 
           echo 'ebdddc936f61e14049a2d4b549a412b8a40deeff6540e58a9f2a2da9e6b18894  dist/macos-x64/SAPGUN Media Grabber.app/Contents/MacOS/tools/ffmpeg' | shasum -a 256 -c -
           echo 'fa3add0ce901f7241abe0dfc0155d958fc834aca3f8ce61f87cc712ae669c1e0  dist/macos-x64/SAPGUN Media Grabber.app/Contents/MacOS/tools/ffprobe' | shasum -a 256 -c -
@@ -135,6 +139,10 @@ jobs:
           file "$TOOLS/ffmpeg"
           "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -q libx264
           "$TOOLS/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
+          test -s "$APP/Contents/Resources/FFmpeg-LICENSE.txt"
+          test -s "$APP/Contents/Resources/yt-dlp-LICENSE.txt"
+          test -s "$APP/Contents/Resources/THIRD_PARTY_NOTICES.txt"
+          test -s "$APP/Contents/Resources/LICENSE.txt"
 
       - name: X-ready MP4 codec smoke test
         run: |

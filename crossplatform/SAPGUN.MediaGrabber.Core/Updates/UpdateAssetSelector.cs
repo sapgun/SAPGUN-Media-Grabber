@@ -6,11 +6,8 @@ namespace SapgunMediaGrabber.Updates;
 public static class UpdateAssetSelector
 {
     public const string WindowsInstallerName = "SAPGUN-Media-Grabber-Setup.exe";
+    public const string WindowsInstallerChecksumName = "SHA256SUMS-win-setup.txt";
 
-    static readonly Regex LinuxX64Package = new(@"^SAPGUN-Media-Grabber-v.+-linux-x64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-    static readonly Regex LinuxArm64Package = new(@"^SAPGUN-Media-Grabber-v.+-linux-arm64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-    static readonly Regex MacosArm64Package = new(@"^SAPGUN-Media-Grabber-v.+-macos-arm64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-    static readonly Regex MacosX64Package = new(@"^SAPGUN-Media-Grabber-v.+-macos-x64\.tar\.gz$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     static readonly Regex WindowsZipPackage = new(@"^SAPGUN-Media-Grabber-v.+-windows-x64\.zip$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public static SelectedUpdateAsset? Select(GitHubRelease release, string platform)
@@ -22,9 +19,7 @@ public static class UpdateAssetSelector
             : SelectNamedPackage(release, platform);
         if (package is null) return null;
 
-        var checksumName = package.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-            ? null
-            : ExpectedChecksumName(platform);
+        var checksumName = ChecksumNameForPackage(package.Name, platform);
         var checksum = checksumName == null
             ? null
             : release.Assets.FirstOrDefault(a => string.Equals(a.Name, checksumName, StringComparison.Ordinal));
@@ -69,14 +64,38 @@ public static class UpdateAssetSelector
     static GitHubAsset? SelectNamedPackage(GitHubRelease release, string platform)
     {
         var expectedName = ExpectedPackageName(release.TagName, platform);
-        GitHubAsset? package = null;
+        var tarball = UniqueNamedAsset(release, expectedName);
+        if (DuplicateNamedAsset(release, expectedName)) return null;
+        if (tarball != null) return tarball;
+
+        var appImageName = ExpectedAppImageName(release.TagName, platform);
+        if (appImageName is null) return null;
+        if (DuplicateNamedAsset(release, appImageName)) return null;
+        return UniqueNamedAsset(release, appImageName);
+    }
+
+    static GitHubAsset? UniqueNamedAsset(GitHubRelease release, string name)
+    {
+        GitHubAsset? found = null;
         foreach (var asset in release.Assets)
         {
-            if (!MatchesPackage(asset.Name, platform, expectedName)) continue;
-            if (package != null) return null;
-            package = asset;
+            if (!string.Equals(asset.Name, name, StringComparison.Ordinal)) continue;
+            if (found != null) return null;
+            found = asset;
         }
-        return package;
+        return found;
+    }
+
+    static bool DuplicateNamedAsset(GitHubRelease release, string name)
+    {
+        var count = 0;
+        foreach (var asset in release.Assets)
+        {
+            if (!string.Equals(asset.Name, name, StringComparison.Ordinal)) continue;
+            count++;
+            if (count > 1) return true;
+        }
+        return false;
     }
 
     public static string ExpectedWindowsZipName(string tagName)
@@ -106,6 +125,17 @@ public static class UpdateAssetSelector
         return tag;
     }
 
+    public static string? ExpectedAppImageName(string tagName, string platform)
+    {
+        var tag = NormalizeTag(tagName);
+        return platform switch
+        {
+            PlatformDetector.LinuxX64 => $"SAPGUN-Media-Grabber-{tag}-linux-x64.AppImage",
+            PlatformDetector.LinuxArm64 => $"SAPGUN-Media-Grabber-{tag}-linux-arm64.AppImage",
+            _ => null
+        };
+    }
+
     public static string? ExpectedChecksumName(string platform) => platform switch
     {
         PlatformDetector.WinX64 => "SHA256SUMS-win-x64.txt",
@@ -116,18 +146,18 @@ public static class UpdateAssetSelector
         _ => null
     };
 
-    static bool MatchesPackage(string name, string platform, string expectedName)
+    public static string? ChecksumNameForPackage(string packageName, string platform)
     {
-        if (string.Equals(name, expectedName, StringComparison.Ordinal)) return true;
-        return platform switch
-        {
-            PlatformDetector.WinX64 => string.Equals(name, expectedName, StringComparison.Ordinal) || string.Equals(name, WindowsInstallerName, StringComparison.Ordinal),
-            PlatformDetector.LinuxX64 => LinuxX64Package.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
-            PlatformDetector.LinuxArm64 => LinuxArm64Package.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
-            PlatformDetector.OsxArm64 => MacosArm64Package.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
-            PlatformDetector.OsxX64 => MacosX64Package.IsMatch(name) && name.Equals(expectedName, StringComparison.Ordinal),
-            _ => false
-        };
+        if (string.Equals(packageName, WindowsInstallerName, StringComparison.OrdinalIgnoreCase))
+            return WindowsInstallerChecksumName;
+        if (packageName.EndsWith(".AppImage", StringComparison.OrdinalIgnoreCase))
+            return platform switch
+            {
+                PlatformDetector.LinuxX64 => "SHA256SUMS-linux-x64-appimage.txt",
+                PlatformDetector.LinuxArm64 => "SHA256SUMS-linux-arm64-appimage.txt",
+                _ => null
+            };
+        return ExpectedChecksumName(platform);
     }
 
     public static string? DigestSha256(string? digest)

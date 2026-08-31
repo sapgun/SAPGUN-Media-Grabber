@@ -17,6 +17,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\Programs\SAPGUN Media Grabber
 DefaultGroupName=SAPGUN Media Grabber
 PrivilegesRequired=lowest
+LicenseFile=..\LICENSE
 OutputDir=..\dist
 OutputBaseFilename=SAPGUN-Media-Grabber-Setup
 Compression=lzma2

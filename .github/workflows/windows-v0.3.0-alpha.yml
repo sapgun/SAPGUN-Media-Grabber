@@ -86,6 +86,12 @@ jobs:
           New-Item -ItemType Directory -Force -Path 'dist/windows-x64/app/tools' | Out-Null
           Copy-Item $ffmpeg.FullName 'dist/windows-x64/app/tools/ffmpeg.exe'
           Copy-Item $ffprobe.FullName 'dist/windows-x64/app/tools/ffprobe.exe'
+          $fflic = Get-ChildItem -Path $dir -Recurse -File | Where-Object { $_.Name -match '^(LICENSE|COPYING)' } | Select-Object -First 1
+          if (-not $fflic) { throw 'FFmpeg license file missing from the BtbN archive' }
+          Copy-Item $fflic.FullName 'dist/windows-x64/app/FFmpeg-LICENSE.txt'
+          curl.exe -fL --retry 3 https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/LICENSE -o 'dist/windows-x64/app/yt-dlp-LICENSE.txt'
+          Copy-Item 'crossplatform/packaging/THIRD_PARTY_NOTICES.txt' 'dist/windows-x64/app/THIRD_PARTY_NOTICES.txt'
+          Copy-Item 'LICENSE' 'dist/windows-x64/app/LICENSE.txt'
           & 'dist/windows-x64/app/tools/ffmpeg.exe' -version | Select-Object -First 1
           & 'dist/windows-x64/app/tools/ffprobe.exe' -version | Select-Object -First 1
 
@@ -98,6 +104,10 @@ jobs:
           test -f dist/windows-x64/app/tools/yt-dlp.exe
           test -f dist/windows-x64/app/tools/ffmpeg.exe
           test -f dist/windows-x64/app/tools/ffprobe.exe
+          test -s dist/windows-x64/app/FFmpeg-LICENSE.txt
+          test -s dist/windows-x64/app/yt-dlp-LICENSE.txt
+          test -s dist/windows-x64/app/THIRD_PARTY_NOTICES.txt
+          test -s dist/windows-x64/app/LICENSE.txt
           dist/windows-x64/app/tools/ffmpeg.exe -hide_banner -encoders 2>/dev/null | grep -q libx264
           dist/windows-x64/app/tools/ffmpeg.exe -hide_banner -encoders 2>/dev/null | grep -Eq '(^| )A.*aac|aac'
 

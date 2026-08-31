@@ -23,6 +23,9 @@ This build is NOT signed or notarized. Finder launch, Gatekeeper, Retina
 layout, and browser cookies still need real-user testing. Do not treat it
 as a stable macOS release.
 
+Licenses are inside the .app at Contents/Resources:
+LICENSE.txt, THIRD_PARTY_NOTICES.txt, FFmpeg-LICENSE.txt, yt-dlp-LICENSE.txt.
+
 The in-app APP updater downloads a new tar.gz and reveals it. It does not
 replace this .app automatically.
 

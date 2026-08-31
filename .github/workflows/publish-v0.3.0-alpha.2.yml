@@ -101,6 +101,12 @@ jobs:
           test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-arm64.tar.gz
           test -f release/SHA256SUMS-linux-x64.txt
           test -f release/SHA256SUMS-macos-arm64.txt
+          if [ -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-x64.AppImage ]; then
+            test -f release/SHA256SUMS-linux-x64-appimage.txt
+          fi
+          if [ -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-arm64.dmg ]; then
+            test -f release/SHA256SUMS-macos-arm64-dmg.txt
+          fi
           echo '--- Linux checksum ---'
           cat release/SHA256SUMS-linux-x64.txt
           echo '--- macOS checksum ---'
@@ -108,8 +114,12 @@ jobs:
           if [ -n "${{ inputs.windows_run_id }}" ]; then
             test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-windows-x64.zip
             test -f release/SHA256SUMS-win-x64.txt
+            test -f release/SAPGUN-Media-Grabber-Setup.exe
+            test -f release/SHA256SUMS-win-setup.txt
             echo '--- Windows checksum ---'
             cat release/SHA256SUMS-win-x64.txt
+            echo '--- Windows Setup checksum ---'
+            cat release/SHA256SUMS-win-setup.txt
           fi
           if [ -n "${{ inputs.macos_intel_run_id }}" ]; then
             test -f release/SAPGUN-Media-Grabber-v0.3.0-alpha.2-macos-x64.tar.gz
@@ -154,6 +164,11 @@ jobs:
 
           Extract and run:
           `./app/sapgun-media-grabber`
+
+          If this release also includes an `.AppImage`, that is a single-file extra.
+          The in-app updater still prefers the tar.gz when both are present.
+
+          Bundled packages include LICENSE.txt plus yt-dlp and FFmpeg license files.
 
           ## Linux arm64 — Alpha (optional)
 

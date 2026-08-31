@@ -61,6 +61,8 @@ A public **v0.3.0-alpha.1** Linux x64 archive is on GitHub Releases (prerelease,
 
 After extracting, run `./app/sapgun-media-grabber`. Optional: `./app/install-desktop.sh` writes a `.desktop` launcher into `~/.local/share/applications`.
 
+CI also builds a Linux **AppImage** (x64 and arm64). The in-app updater still prefers the `.tar.gz` when both exist.
+
 Stable users should keep using the Windows installer from **Latest Release**. Do not treat Linux alpha as production.
 
 ### macOS Apple Silicon — v0.3.0 alpha

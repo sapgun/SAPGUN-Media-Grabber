@@ -111,12 +111,14 @@ public class UpdateAssetSelectorTests
         var selected = UpdateAssetSelector.Select(Release(prerelease: false,
             Asset("SAPGUN-Media-Grabber-Setup.exe"),
             Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-windows-x64.zip", "sha256:" + new string('a', 64)),
-            Asset("SHA256SUMS-win-x64.txt")),
+            Asset("SHA256SUMS-win-x64.txt"),
+            Asset("SHA256SUMS-win-setup.txt")),
             PlatformDetector.WinX64);
 
         Assert.NotNull(selected);
         Assert.Equal(UpdateAssetSelector.WindowsInstallerName, selected!.Package.Name);
         Assert.Equal(UpdateApplyAction.LaunchInstallerAndExit, selected.ApplyAction);
+        Assert.Equal(UpdateAssetSelector.WindowsInstallerChecksumName, selected.ChecksumFile?.Name);
     }
 
     [Fact]
@@ -146,6 +148,48 @@ public class UpdateAssetSelectorTests
             Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-x64.tar.gz")),
             PlatformDetector.LinuxX64);
         Assert.Null(selected);
+    }
+
+    [Fact]
+    public void PrefersLinuxTarballOverAppImage()
+    {
+        var selected = UpdateAssetSelector.Select(Release(
+            Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-x64.tar.gz"),
+            Asset("SHA256SUMS-linux-x64.txt"),
+            Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-x64.AppImage"),
+            Asset("SHA256SUMS-linux-x64-appimage.txt")),
+            PlatformDetector.LinuxX64);
+
+        Assert.NotNull(selected);
+        Assert.Equal("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-x64.tar.gz", selected!.Package.Name);
+        Assert.Equal("SHA256SUMS-linux-x64.txt", selected.ChecksumFile?.Name);
+    }
+
+    [Fact]
+    public void FallsBackToLinuxAppImageWhenTarballIsMissing()
+    {
+        var selected = UpdateAssetSelector.Select(Release(
+            Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-x64.AppImage", "sha256:" + new string('e', 64)),
+            Asset("SHA256SUMS-linux-x64-appimage.txt")),
+            PlatformDetector.LinuxX64);
+
+        Assert.NotNull(selected);
+        Assert.Equal("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-x64.AppImage", selected!.Package.Name);
+        Assert.Equal("SHA256SUMS-linux-x64-appimage.txt", selected.ChecksumFile?.Name);
+        Assert.Equal(UpdateApplyAction.RevealDownload, selected.ApplyAction);
+    }
+
+    [Fact]
+    public void FallsBackToLinuxArm64AppImageWhenTarballIsMissing()
+    {
+        var selected = UpdateAssetSelector.Select(Release(
+            Asset("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-arm64.AppImage"),
+            Asset("SHA256SUMS-linux-arm64-appimage.txt")),
+            PlatformDetector.LinuxArm64);
+
+        Assert.NotNull(selected);
+        Assert.Equal("SAPGUN-Media-Grabber-v0.3.0-alpha.2-linux-arm64.AppImage", selected!.Package.Name);
+        Assert.Equal("SHA256SUMS-linux-arm64-appimage.txt", selected.ChecksumFile?.Name);
     }
 
     [Fact]
